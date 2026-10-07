@@ -5,15 +5,57 @@ context: |
   All artifacts must be written in pt-BR.
   Keep OpenSpec structural headings and SHALL/MUST keywords in English.
 
-# Per-artifact rules (optional)
-# Add custom rules for specific artifacts.
-# Example:
-#   rules:
-#     proposal:
-#       - Keep proposals under 500 words
-#       - Always state what is out of scope
-#     tasks:
-#       - Break tasks into chunks of max 2 hours
+  Projeto: carteira digital de portfólio em microserviços. Titulares abrem conta, recebem depósitos, transferem
+  dinheiro entre si, consultam extrato e são notificados. Objetivo: demonstrar decisões reais de sistemas
+  financeiros (consistência, idempotência, sagas, auditabilidade), não um CRUD.
+
+  Stack: Java 25; Spring Boot 4.1 (Spring Framework 7, Spring Security 7) com virtual threads; Spring Cloud
+  compatível com o Boot 4.x; PostgreSQL, um por serviço; Keycloak (OAuth2/OIDC, JWT); Kafka como único broker
+  (ADR-0003); OpenAPI (springdoc); Docker Compose local. Monorepo com um projeto Maven por serviço em
+  services/<nome> e POM raiz apenas agregador (ADR-0002).
+
+  Princípios da constituição (inegociáveis):
+  - I. Um banco por serviço; integração só por API ou eventos.
+  - II. Dinheiro nunca é ponto flutuante: inteiros em centavos + moeda, tipo Money na aplicação.
+  - III. Livro-razão imutável com partidas dobradas; saldo derivado, nunca negativo; correção só por estorno;
+    movimentação entre contas internas numa única transação ACID no Ledger (ADR-0001).
+  - IV. Idempotência obrigatória em operações que movimentam dinheiro ou criam recursos, e em todo consumidor de evento.
+  - V. Toda spec declara consistência (CP ou AP) por operação e o comportamento na falha.
+  - VI. Eventos publicados via Outbox, com eventId, occurredAt, aggregateId e versão do schema.
+  - VII. Testes fazem parte do pronto: @DisplayName, Testcontainers, testes de contrato, um teste por critério de aceite.
+  - VIII. Observabilidade desde o primeiro serviço: traceId propagado, logs JSON sem dados pessoais, métricas RED.
+  - IX. Segurança em profundidade: token validado no Gateway e em cada serviço, titular só acessa as próprias
+    contas, segredos fora do repositório, LGPD.
+  - X. Simplicidade antes de escala: novo serviço só com ADR; tecnologia nova só se resolve problema de uma spec.
+  - XI. Erros no formato ProblemDetail (RFC 9457) com código de negócio estável.
+  - XII. Somente APIs atuais do stack; a tabela de APIs proibidas está na constituição.
+
+  Fonte da verdade (ler antes de gerar qualquer artefato; em conflito, eles prevalecem):
+  - docs/constitution.md
+  - docs/arquitetura/visao-geral.md
+  - docs/dominio/
+  - docs/adr/
+
+rules:
+  proposal:
+    - Explicar o problema que a mudança resolve e o valor que ela entrega
+    - Listar explicitamente o que fica fora de escopo
+  specs:
+    - Descrever o quê e o porquê, sem citar tecnologia, framework ou detalhe de implementação
+    - Escrever critérios de aceite verificáveis, cada um testável de forma objetiva
+    - Cobrir os casos de borda (repetição da mesma requisição, dados inválidos, falha de dependência, concorrência)
+    - Incluir a seção obrigatória "Decisões de consistência", classificando cada operação como CP ou AP e
+      descrevendo o comportamento na falha (constituição, Artigo V)
+  design:
+    - Validar o design contra a constituição antes de qualquer decisão e apontar qualquer conflito
+    - Listar as alternativas descartadas e o motivo de cada uma
+    - Indicar quando uma decisão deve virar ADR (novo serviço, nova tecnologia, mudança de princípio ou de ADR aceita)
+    - Usar apenas APIs atuais do stack; nada da lista de proibidos do Artigo XII
+  tasks:
+    - Cada tarefa aponta para o requisito ou critério de aceite que atende
+    - Cada tarefa tem validação objetiva por meio de teste
+    - Testes são escritos junto com a tarefa, nunca deixados para o final
+    - Usar os mesmos nomes de classes, endpoints, eventos e tabelas definidos no design
 
 # Per-operation guidance (optional)
 # Add advisory guidance for how apply and archive work should be conducted.
