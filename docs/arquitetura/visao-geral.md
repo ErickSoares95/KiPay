@@ -67,12 +67,12 @@ flowchart LR
     TRF -- "REST: reservar / liquidar / liberar" --> LED[Ledger]
     TRF -- "REST com timeout + fallback" --> AF[Antifraude]
 
-    ACC -- "evento: ContaAberta" --> MQ[(Kafka)]
+    ACC -- "evento: AccountOpened" --> MQ[(Kafka)]
     MQ --> LED
-    LED -- "evento: ContaContabilCriada" --> MQ
+    LED -- "evento: LedgerAccountCreated" --> MQ
     MQ --> ACC
 
-    LED -- "evento: LancamentoRegistrado" --> MQ
+    LED -- "evento: LedgerEntryPosted" --> MQ
     MQ --> STM
     MQ --> NTF[Notifications]
 ```
@@ -86,7 +86,7 @@ flowchart LR
 
 | Operação | Escolha | Como | Comportamento na falha |
 |---|---|---|---|
-| Abrir conta | AP no cadastro, CP na ativação | Conta nasce PENDENTE; vira ATIVA ao receber `ContaContabilCriada` | Conta permanece PENDENTE e não movimenta dinheiro |
+| Abrir conta | AP no cadastro, CP na ativação | Conta nasce PENDENTE; vira ATIVA ao receber `LedgerAccountCreated` | Conta permanece PENDENTE e não movimenta dinheiro |
 | CPF único | CP | Restrição de unicidade no banco do Accounts | Recusa a segunda abertura |
 | Depósito (cash-in simulado) | CP | Transação ACID no Ledger + idempotência | Recusa e permite nova tentativa |
 | Reservar saldo | CP | Transação ACID + lock otimista na conta contábil | Recusa a transferência (saldo insuficiente ou conflito) |

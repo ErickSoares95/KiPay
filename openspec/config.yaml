@@ -4,6 +4,8 @@ context: |
   Language: pt-BR
   All artifacts must be written in pt-BR.
   Keep OpenSpec structural headings and SHALL/MUST keywords in English.
+  Código em inglês (classes, eventos, tópicos, tabelas, endpoints, enums), com os nomes definidos em
+  docs/dominio/glossario.md (ADR-0004). Em design e tasks, citar sempre o nome em inglês do glossário.
 
   Projeto: carteira digital de portfólio em microserviços. Titulares abrem conta, recebem depósitos, transferem
   dinheiro entre si, consultam extrato e são notificados. Objetivo: demonstrar decisões reais de sistemas
@@ -33,7 +35,7 @@ context: |
   Fonte da verdade (ler antes de gerar qualquer artefato; em conflito, eles prevalecem):
   - docs/constitution.md
   - docs/arquitetura/visao-geral.md
-  - docs/dominio/
+  - docs/dominio/ (inclui o glossário pt-BR → inglês)
   - docs/adr/
 
 rules:

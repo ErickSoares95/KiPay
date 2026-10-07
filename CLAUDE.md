@@ -24,6 +24,15 @@ A constituição é carregada abaixo e deve ser seguida antes de qualquer tarefa
 - Injeção de dependência sempre via construtor. Não use `@Autowired` em campo nem em setter.
 - Testes com `@DisplayName` descritivo e verificação explícita do resultado e das interações relevantes.
 
+## Idioma (ADR-0004)
+
+- Documentação e artefatos do OpenSpec em português (pt-BR).
+- Código em inglês: pacotes, classes, métodos, eventos, tópicos, tabelas, endpoints, enums e logs. O texto do
+  `@DisplayName` fica em português.
+- Use os nomes em inglês definidos em `docs/dominio/glossario.md`. Um termo de negócio novo entra no glossário antes
+  de virar código; se ele faltar, pare e proponha a tradução.
+- Pix, CPF, SPI, DICT, MED e LGPD não são traduzidos.
+
 ## ADRs
 
 - ADRs ficam em `docs/adr/`, numeradas, seguindo `docs/adr/0000-template.md`.
