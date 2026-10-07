@@ -23,6 +23,33 @@
 hs_err_pid*
 replay_pid*
 
+# Maven
+target/
+pom.xml.tag
+pom.xml.releaseBackup
+pom.xml.versionsBackup
+pom.xml.next
+release.properties
+dependency-reduced-pom.xml
+buildNumber.properties
+.mvn/timing.properties
+!.mvn/wrapper/maven-wrapper.jar
+
+# IntelliJ IDEA
+.idea/
+*.iml
+*.iws
+*.ipr
+out/
+
+# Logs
+logs/
+
+# Variáveis de ambiente / segredos
+.env
+.env.*
+!.env.example
+
 # Claude Code (configurações locais)
 .claude/settings.local.json
 CLAUDE.local.md
