@@ -139,7 +139,7 @@ Fazer o OpenSpec injetar a constituição e as lições de SDD em todo artefato 
 ### Passos
 Preencher `openspec/config.yaml`:
 
-- `context`: resumo do projeto e da stack (Java 25, Spring Boot 4.1, PostgreSQL por serviço, Keycloak, RabbitMQ),
+- `context`: resumo do projeto e da stack (Java 25, Spring Boot 4.1, PostgreSQL por serviço, Keycloak, Kafka),
   os princípios da constituição em uma linha cada, e a indicação de que `docs/constitution.md`,
   `docs/arquitetura/visao-geral.md`, `docs/dominio/` e `docs/adr/` são a fonte da verdade
 - `rules` por artefato:

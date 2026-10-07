@@ -4,7 +4,7 @@
 > Mudar um princípio exige nova versão desta constituição e uma ADR explicando o motivo.
 > Ao adotar o OpenSpec, este conteúdo passa a ser o contexto do projeto lido em toda mudança.
 
-**Versão**: 1.1.0 · **Ratificada em**: 2026-10 · **Última alteração**: 2026-10
+**Versão**: 1.2.0 · **Ratificada em**: 2026-10 · **Última alteração**: 2026-10
 
 ---
 
@@ -44,7 +44,7 @@ na mesma transação e publicados depois. Eventos carregam `eventId`, `occurredA
 ## Artigo VII — Testes como parte da definição de pronto
 
 - Testes unitários com nomes descritivos (`@DisplayName`) e verificação explícita das interações relevantes.
-- Testes de integração com dependências reais via **Testcontainers** (PostgreSQL, RabbitMQ, Kafka).
+- Testes de integração com dependências reais via **Testcontainers** (PostgreSQL, Kafka).
 - Integrações entre serviços cobertas por **testes de contrato**.
 - Cada critério de aceite da spec corresponde a pelo menos um teste.
 
@@ -109,7 +109,7 @@ de alguma biblioteca ao stack atual) só com ADR.
 | Spring Cloud | Release train compatível com o Boot 4.x (2025.1 Oakwood ou sucessor) |
 | Banco | PostgreSQL, um por serviço |
 | Identidade | Keycloak (OAuth2 / OpenID Connect, JWT) |
-| Mensageria | RabbitMQ (comandos e filas de trabalho); Kafka a partir da fase de streaming |
+| Mensageria | Kafka (eventos de domínio e comandos assíncronos), desde a primeira fase (ver ADR-0003) |
 | Contratos | OpenAPI (springdoc) para APIs; schemas versionados para eventos |
 | Execução local | Docker Compose; Kubernetes a partir da fase de plataforma |
 

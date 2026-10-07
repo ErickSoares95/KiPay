@@ -67,7 +67,7 @@ flowchart LR
     TRF -- "REST: reservar / liquidar / liberar" --> LED[Ledger]
     TRF -- "REST com timeout + fallback" --> AF[Antifraude]
 
-    ACC -- "evento: ContaAberta" --> MQ[(RabbitMQ)]
+    ACC -- "evento: ContaAberta" --> MQ[(Kafka)]
     MQ --> LED
     LED -- "evento: ContaContabilCriada" --> MQ
     MQ --> ACC
@@ -79,8 +79,8 @@ flowchart LR
 
 - **Síncrono (REST)**: quando quem chama precisa da resposta para continuar (validar conta, reservar saldo).
 - **Assíncrono (eventos)**: quando o interessado pode reagir depois (criar conta contábil, atualizar extrato, notificar).
-- Evolução prevista: os comandos Transfers → Ledger passam de REST para mensagens na fase de comunicação assíncrona,
-  e eventos de alto volume migram para Kafka na fase de streaming.
+- Evolução prevista: os comandos Transfers → Ledger passam de REST para mensagens no Kafka na fase de comunicação
+  assíncrona. O Kafka é o único broker do projeto desde a fase 1 (ver ADR-0003).
 
 ## 5. Decisões de consistência por operação
 
@@ -94,7 +94,7 @@ flowchart LR
 | Coordenar a transferência | Eventualmente consistente | Saga orquestrada no Transfers, com compensação | Compensação: liberar reserva |
 | Score antifraude | AP com timeout | Chamada com timeout e circuit breaker | Fallback conservador: aprova valores baixos, segura valores altos |
 | Extrato | AP | Read model atualizado por eventos | Mostra dados com alguns segundos de atraso |
-| Notificações | AP | Fila + retry + DLQ | Entrega atrasada |
+| Notificações | AP | Tópico + tópicos de retry + DLT | Entrega atrasada |
 | Conciliação diária | Consistência no fim do dia | Spring Batch | Reprocessa a partir do último ponto confirmado |
 
 ## 6. Roadmap de features (cada uma vira uma mudança no OpenSpec)
@@ -102,15 +102,15 @@ flowchart LR
 | Ordem | Feature | O que nasce na arquitetura | Conceitos revisados |
 |---|---|---|---|
 | 0 | Fundação do repositório | Repositório, documentação, OpenSpec | SDD, ADR |
-| 1 | Abertura de conta | Accounts e Ledger, PostgreSQL por serviço, RabbitMQ, Outbox, Docker Compose, CI | Database per Service, coreografia, consistência eventual, consumidor idempotente, unicidade |
+| 1 | Abertura de conta | Accounts e Ledger, PostgreSQL por serviço, Kafka, Outbox, Docker Compose, CI | Database per Service, coreografia, consistência eventual, consumidor idempotente, unicidade |
 | 2 | Depósito simulado (cash-in) | Núcleo do Ledger: lançamentos e saldo | Partidas dobradas, idempotência, ACID, saldo nunca negativo |
 | 3 | Borda e identidade | Keycloak, API Gateway, Service Registry, Config Server | Access Token Pattern, JWT/JWKS, dupla validação, Service Discovery |
 | 4 | Transferência interna | Transfers | Saga orquestrada, reserva, compensação, Resilience4j |
 | 5 | Extrato | Statement | CQRS, eventos, Outbox |
-| 6 | Notificações | Notifications | Consumidores idempotentes, DLQ |
+| 6 | Notificações | Notifications | Consumidores idempotentes, retry e DLT |
 | 7 | Antifraude | Antifraude | Circuit breaker, timeout, fallback consciente (AP vs CP) |
 | 8 | Observabilidade completa | OpenTelemetry e dashboards | Traces, métricas, SLOs |
-| 9 | Pix simulado | Pix e "SPI simulado" | Chaves, limites, Kafka |
+| 9 | Pix simulado | Pix e "SPI simulado" | Chaves, limites, particionamento e ordenação no Kafka |
 | 10 | Conciliação diária | Reconciliation | Spring Batch, reprocessamento |
 | 11 | Plataforma e deploy | Kubernetes, gestão de segredos, AWS | Deploy, Vault/Secrets Manager |
 | 12 | Assistente | Assistant | Spring AI, RAG |
