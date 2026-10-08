@@ -1,6 +1,6 @@
 # ADR-0008 — Arquitetura interna dos serviços
 
-**Status**: Proposta
+**Status**: Aceita
 **Data**: 2026-10-08
 
 ## Contexto
