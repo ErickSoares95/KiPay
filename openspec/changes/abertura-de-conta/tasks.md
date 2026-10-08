@@ -112,7 +112,7 @@
 
 ## 4. Domínio do Accounts (contas)
 
-- [ ] 4.1 Implementar o value object `Cpf`: normalização, formato, dígitos verificadores, dígitos repetidos e
+- [x] 4.1 Implementar o value object `Cpf`: normalização, formato, dígitos verificadores, dígitos repetidos e
   `toString()` mascarado (D2). Requisito: "Validação do CPF". Verificação: testes unitários cobrem os quatro cenários
   do requisito e o mascaramento.
 - [ ] 4.2 Implementar as entidades `AccountHolder` (`cpf`, `ownerSubject`, `fullName`, `birthDate`, `email`) e
