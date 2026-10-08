@@ -36,6 +36,10 @@
     Resilience4j e `springdoc-openapi-starter-webmvc-ui` 3.x;
   - nesse POM, um contrato de mensagem de brinquedo (Kafka, payload JSON com Jackson 3) gera o teste de produtor pelo
     plugin, e `mvn verify` passa;
+  - o POM de teste tem dois módulos com contratos nos dois sentidos. Cada consumidor gera os stubs a partir da pasta
+    de contratos do outro módulo, sem dependência Maven entre os módulos (D10). O `mvn verify` passa com um
+    repositório local vazio (`-Dmaven.repo.local=<pasta nova>`), e cada módulo também builda sozinho com
+    `mvn -f <módulo>`. A ADR registra a configuração do Stub Runner usada;
   - a ADR registra a decisão sobre o Service Registry (Eureka na feature 3, ou o adiamento se o Kubernetes o
     dispensar);
   - a ADR fica com o status "Aceita" depois da revisão.
@@ -90,7 +94,8 @@
   migration `V1` com as constraints `uk_account_holders_cpf`, `uk_account_holders_owner_subject` e o índice parcial
   `uk_accounts_open_per_holder` (D2). Requisitos: "Conta não ativa não movimenta dinheiro", "CPF único", "Vínculo entre
   identidade e CPF" e a parte idempotente de "Ativação após a confirmação do livro-razão". Verificação:
-  - testes unitários de `canMoveMoney` (PENDING, ACTIVE e CLOSED) e de `activate` repetido;
+  - testes unitários de `canMoveMoney` (PENDING, ACTIVE e CLOSED, cenários do requisito "Conta não ativa não movimenta
+    dinheiro") e de `activate` repetido;
   - um teste confirma que os ids gerados são UUID versão 7;
   - testes de repositório com Testcontainers confirmam as três constraints, inclusive que uma segunda conta é aceita
     quando a primeira está `CLOSED`.
@@ -200,10 +205,12 @@
 
 - [ ] 8.1 Criar os contratos de `AccountOpened` (produtor Accounts, consumidor Ledger) e de `LedgerAccountCreated`
   (produtor Ledger, consumidor Accounts). Os testes de produtor são gerados nos dois serviços, e o Stub Runner dispara
-  o listener do consumidor. Requisitos: "Evento de conta aberta", "Criação da conta contábil a partir da conta
-  aberta", "Confirmação da criação da conta contábil" e "Ativação após a confirmação do livro-razão". Verificação:
-  `mvn verify` passa nos dois serviços, e alterar um campo do payload em qualquer produtor quebra o teste de produtor
-  correspondente.
+  o listener do consumidor a partir dos contratos do produtor no monorepo, sem dependência Maven entre os serviços
+  (D10). Requisitos: "Evento de conta aberta", "Criação da conta contábil a partir da conta aberta", "Confirmação da
+  criação da conta contábil" e "Ativação após a confirmação do livro-razão". Verificação:
+  - `mvn verify` na raiz passa com um repositório local vazio;
+  - `mvn -f services/accounts verify` e `mvn -f services/ledger verify` passam sozinhos;
+  - alterar um campo do payload em qualquer produtor quebra o teste de produtor correspondente.
 
 ## 9. Verificação ponta a ponta
 

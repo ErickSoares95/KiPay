@@ -231,6 +231,10 @@ de movimentação criadas em changes futuras MUST consultar essa regra e recusar
 - **WHEN** se verifica se uma conta ATIVA pode movimentar dinheiro
 - **THEN** a resposta é positiva
 
+#### Scenario: Conta encerrada
+- **WHEN** se verifica se uma conta ENCERRADA pode movimentar dinheiro
+- **THEN** a resposta é negativa
+
 ### Requirement: Consulta da própria conta
 O sistema SHALL permitir que uma pessoa autenticada consulte uma conta aberta por ela, informando o identificador da
 conta, e receba o status, se a conta pode movimentar dinheiro e o momento da abertura e da ativação. O CPF MUST

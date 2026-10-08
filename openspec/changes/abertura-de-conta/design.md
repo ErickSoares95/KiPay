@@ -167,10 +167,16 @@ Fluxo do `AccountOpeningService`:
 
    Como a chave é reservada primeiro, dois pedidos idênticos nunca chegam às constraints de `account_holders` ao mesmo
    tempo. Isso evita que o segundo receba um `409` de CPF sobre uma chave que já tem `201`.
-4. Se for detectada uma das recusas de unicidade de D3 (`ACCOUNT_ALREADY_OPEN`, `ACCOUNT_CPF_ALREADY_REGISTERED` ou
-   `ACCOUNT_IDENTITY_ALREADY_LINKED`), pela verificação prévia ou por violação de constraint, a transação é desfeita.
-   Uma nova transação refaz as verificações 4 e 5 de D3 para decidir o código e grava o `idempotency_records` com a
-   resposta `409`. Assim, a repetição devolve a mesma recusa. Se esse `INSERT` violar a PK, vale o passo 3.
+4. As recusas de unicidade de D3 (`ACCOUNT_ALREADY_OPEN`, `ACCOUNT_CPF_ALREADY_REGISTERED` ou
+   `ACCOUNT_IDENTITY_ALREADY_LINKED`) são gravadas em `idempotency_records` com a resposta `409`, para que a repetição
+   devolva a mesma recusa. Há dois caminhos:
+   - **Recusa na verificação prévia** (verificações 4 e 5 de D3, antes de qualquer gravação): a transação de abertura
+     não chega a começar. Uma transação curta grava direto o `idempotency_records` com o `409`.
+   - **Violação de constraint durante a abertura**: a transação de abertura é desfeita, inclusive a reserva da chave.
+     Uma nova transação refaz as verificações 4 e 5 de D3 para decidir o código e grava o `idempotency_records` com o
+     `409`.
+
+   Nos dois caminhos, se o `INSERT` da chave violar a PK, vale o passo 3.
 5. Erros de validação (`400` e os `422` de CPF inválido, menor de idade e identidade sem e-mail) não são gravados: o
    pedido não foi processado, e o cliente pode corrigi-lo.
 
@@ -288,7 +294,7 @@ traz o `SecurityFilterChain` e a validação do token, como prevê a ADR-0005.
 - Os testes de API usam `SecurityMockMvcRequestPostProcessors.jwt()`, sem `@MockitoBean` do `JwtDecoder`.
 - Alternativa descartada: **container de Keycloak nos testes automatizados (módulo de terceiros do Testcontainers)**.
   Seria mais uma dependência e deixaria os testes mais lentos. O caminho real com o Keycloak é coberto pelo smoke test
-  (tarefa 9).
+  (tarefa 9.1).
 
 ### D10. Spring Cloud e testes de contrato dos eventos (vira ADR-0006)
 
@@ -318,10 +324,23 @@ paro e aviso, em vez de escolher outra versão do Boot.
 Escolha proposta:
 
 **Spring Cloud Contract**, no modo de mensageria:
-- Os contratos de `AccountOpened` ficam no Accounts, que é o produtor. O Accounts gera os testes de produtor e publica
-  stubs.
+- Os contratos de `AccountOpened` ficam no Accounts, que é o produtor, em
+  `services/accounts/src/test/resources/contracts`. O Accounts gera os testes de produtor a partir deles.
 - O Ledger usa o Stub Runner para disparar o evento no próprio listener.
-- O mesmo vale, no sentido inverso, para `LedgerAccountCreated`.
+- O mesmo vale, no sentido inverso, para `LedgerAccountCreated`, com os contratos no Ledger.
+
+**Requisito: nenhum serviço depende de artefato Maven do outro.** Os contratos vão nos dois sentidos. Se cada serviço
+declarasse o jar de stubs do outro como dependência de teste, o reactor do Maven acusaria ciclo (accounts →
+ledger-stubs → ledger → accounts-stubs → accounts). Se os stubs viessem do `~/.m2` sem estar declarados, o primeiro
+`mvn verify` num CI limpo falharia, porque eles ainda não existiriam. Os dois caminhos também quebram a ADR-0002
+(cada serviço buildável sozinho com `mvn -f services/<nome>`).
+
+Por isso, o consumidor gera os stubs na hora, a partir dos contratos do produtor que estão no monorepo. O candidato é o
+Stub Runner apontando para a pasta de contratos do produtor (protocolo `stubs://file://...`, com geração de stubs a
+partir dos contratos). A tarefa 1.4 confirma a configuração exata.
+
+- Alternativa descartada: **jar de stubs do produtor como dependência de teste do consumidor**. Cria ciclo no reactor
+  e impede buildar um serviço sozinho.
 
 A ferramenta faz parte do release train do Spring Cloud, cujas versões vêm do BOM (Artigo XII). Mesmo assim, é
 tecnologia nova no projeto, e por isso a escolha é registrada em uma ADR (ADR-0006) antes do uso.
@@ -331,6 +350,7 @@ A ADR-0006 compara o Spring Cloud Contract com o Pact pelos critérios abaixo:
 - suporte a mensagens no Kafka;
 - integração com o Maven e o Spring Boot 4.1;
 - necessidade de infraestrutura extra (Pact Broker, que é dispensável num monorepo);
+- como o contrato chega ao outro lado sem acoplar os builds dos serviços;
 - gestão de versão (BOM do Spring Cloud × versão fixada fora do BOM);
 - compatibilidade com o Jackson 3;
 - custo de manutenção para uma pessoa.

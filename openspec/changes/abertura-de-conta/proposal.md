@@ -97,4 +97,5 @@ Respondidas em 2026-10-07, durante a revisão da proposta:
   pipeline de CI executando `mvn verify`.
 - **Documentação**: atualização do roadmap na visão geral (Keycloak antecipado) e do glossário com os termos novos
   desta change. Duas ADRs novas: ADR-0005 (Keycloak como provedor de identidade, antecipado para esta change) e
-  ADR-0006 (compatibilidade do Spring Cloud com o Boot 4.1 e ferramenta de testes de contrato).
+  ADR-0006 (compatibilidade do Spring Cloud com o Boot 4.1, ferramenta de testes de contrato e versão do springdoc
+  fixada fora dos BOMs).
