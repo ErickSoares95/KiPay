@@ -18,8 +18,8 @@
   - o porquê da escolha: OIDC e JWT padrão, self-hosted no Docker Compose, sem custo nem conta em nuvem, realm
     versionável;
   - a antecipação para a change 001;
-  - por que só o Accounts é resource server nesta change, e por que isso não fere o Artigo IX: o Ledger não recebe
-    requisições com token e passa a validar quando expuser API (change 002);
+  - por que só o Accounts é resource server nesta change: o Ledger não recebe requisições com token e passa a validar
+    quando expuser API (change 002). O Artigo IX fica atendido parcialmente, e essa pendência é aceita na ADR;
   - a aceitação formal de que a validação no Gateway fica para a feature 3;
   - as alternativas descartadas: Spring Authorization Server, AWS Cognito e Auth0/Okta.
 
