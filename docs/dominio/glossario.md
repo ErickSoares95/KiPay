@@ -65,7 +65,7 @@
 | Português (docs) | Inglês (código) |
 |---|---|
 | Contas pendentes além do limite | `accounts.pending.stale` |
-| Pedidos de abertura de conta | `accounts.opening.requests` (tag `outcome`) |
+| Eventos não publicados | `outbox.pending` |
 
 ## Códigos de erro
 
@@ -85,6 +85,8 @@ Valores da propriedade `code` do `ProblemDetail` (constituição, Artigo XI).
 | Chave de idempotência inválida | `IDEMPOTENCY_KEY_INVALID` |
 | Chave de idempotência reutilizada | `IDEMPOTENCY_KEY_REUSED` |
 | Pedido em processamento | `IDEMPOTENCY_REQUEST_IN_PROGRESS` |
+| Não autenticado | `AUTHENTICATION_REQUIRED` |
+| Serviço temporariamente indisponível | `SERVICE_UNAVAILABLE` |
 
 ## Serviços
 

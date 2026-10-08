@@ -47,6 +47,15 @@ contábil e identificador da conta de origem.
 - **WHEN** a criação da conta contábil falha e é desfeita
 - **THEN** nenhum evento de conta contábil criada é publicado, e o evento de conta aberta volta a ser processado
 
+### Requirement: Visibilidade de confirmações não publicadas
+O sistema SHALL tornar visível para a operação a quantidade de confirmações de conta contábil criada gravadas e ainda
+não publicadas no canal de eventos.
+
+#### Scenario: Confirmações aguardando o canal de eventos
+- **WHEN** contas contábeis são criadas enquanto o canal de eventos está indisponível
+- **THEN** a quantidade de confirmações não publicadas cresce a cada conta contábil criada e volta a zero quando as
+  confirmações são publicadas
+
 ### Requirement: Eventos inválidos não bloqueiam o processamento
 O sistema SHALL separar para análise todo evento de conta aberta que não pode ser processado (schema desconhecido,
 campos ausentes ou falha persistente), sem criar conta contábil e sem impedir o processamento dos eventos seguintes.

@@ -10,14 +10,15 @@ ciclo de vida dessa conta, da abertura como PENDENTE até a ativação confirmad
 ### Requirement: Abertura de conta por pessoa física autenticada
 O sistema SHALL permitir que uma pessoa autenticada peça a abertura de uma conta informando nome completo, CPF e data
 de nascimento. A conta MUST nascer com status PENDENTE, vinculada à identidade de quem a pediu, e o e-mail do titular
-MUST ser obtido da identidade autenticada, sem ser pedido no cadastro. A resposta MUST trazer o identificador da conta
-e o status.
+MUST ser obtido da identidade autenticada, sem ser pedido no cadastro. A resposta MUST trazer o identificador da conta,
+o status, o CPF mascarado, se a conta pode movimentar dinheiro e o momento da abertura.
 
 #### Scenario: Abertura aceita
 - **WHEN** uma pessoa autenticada, maior de idade e ainda sem conta, envia um pedido de abertura com nome completo,
   CPF válido e ainda não cadastrado, data de nascimento e uma chave de idempotência nova
 - **THEN** o sistema cria a conta com status PENDENTE, guarda o e-mail da identidade junto com o titular e responde com
-  sucesso, trazendo o identificador e o status da conta
+  sucesso, trazendo o identificador, o status, o CPF mascarado, se a conta pode movimentar dinheiro e o momento da
+  abertura
 
 #### Scenario: Identidade sem e-mail
 - **WHEN** uma pessoa autenticada cuja identidade não traz e-mail envia um pedido de abertura válido
@@ -25,12 +26,17 @@ e o status.
 
 #### Scenario: Pedido sem autenticação
 - **WHEN** um pedido de abertura chega sem credencial ou com credencial inválida ou expirada
-- **THEN** o sistema recusa o pedido como não autenticado e não cria nenhuma conta
+- **THEN** o sistema recusa o pedido com o código de erro de não autenticado e não cria nenhuma conta
 
 #### Scenario: Dependência do livro-razão indisponível
 - **WHEN** um pedido de abertura válido chega enquanto o livro-razão ou o canal de eventos está indisponível
 - **THEN** o sistema aceita o pedido e cria a conta como PENDENTE, e a ativação acontece depois que a dependência
   voltar
+
+#### Scenario: Banco do Accounts indisponível na abertura
+- **WHEN** um pedido de abertura válido chega enquanto o banco do próprio Accounts está indisponível
+- **THEN** o sistema recusa o pedido com o código de erro de serviço temporariamente indisponível, não grava nada
+  (nem a chave de idempotência) e o cliente pode repetir o pedido com a mesma chave
 
 ### Requirement: Validação do CPF
 O sistema SHALL recusar um pedido de abertura cujo CPF não seja válido, com um código de erro de negócio estável que
@@ -155,9 +161,14 @@ de conta aberta. Reusar a chave com conteúdo diferente MUST ser recusado.
   existindo uma única conta e um único evento de conta aberta
 
 #### Scenario: Repetição de um pedido recusado
-- **WHEN** um pedido recusado por regra de negócio (por exemplo, CPF já cadastrado) é reenviado com a mesma chave e o
-  mesmo conteúdo
+- **WHEN** um pedido recusado por regra de negócio (por exemplo, CPF já cadastrado ou titular menor de idade) é
+  reenviado com a mesma chave e o mesmo conteúdo
 - **THEN** o sistema devolve a mesma recusa, com o mesmo código de erro
+
+#### Scenario: Repetição de recusa depois de a condição mudar
+- **WHEN** um pedido recusado por titular menor de idade é reenviado com a mesma chave e o mesmo conteúdo depois de o
+  titular completar 18 anos
+- **THEN** o sistema devolve a mesma recusa, e uma nova abertura exige uma nova chave de idempotência
 
 #### Scenario: Mesma chave com conteúdo diferente
 - **WHEN** chega um pedido com uma chave de idempotência já usada pela mesma identidade, mas com conteúdo diferente
@@ -243,7 +254,8 @@ contas nesta capacidade.
 
 #### Scenario: Consulta da própria conta
 - **WHEN** o titular autenticado consulta, pelo identificador, uma conta aberta por ele
-- **THEN** o sistema devolve o identificador, o status atual, se a conta pode movimentar dinheiro e o CPF mascarado
+- **THEN** o sistema devolve o identificador, o status atual, se a conta pode movimentar dinheiro, o CPF mascarado, o
+  momento da abertura e o da ativação, quando houver
 
 #### Scenario: Consulta de conta de outro titular
 - **WHEN** uma pessoa autenticada consulta o identificador de uma conta aberta por outra identidade
@@ -252,6 +264,15 @@ contas nesta capacidade.
 #### Scenario: Consulta de conta inexistente
 - **WHEN** uma pessoa autenticada consulta um identificador de conta que não existe
 - **THEN** o sistema responde que a conta não foi encontrada, com o código de erro de conta não encontrada
+
+#### Scenario: Consulta sem autenticação
+- **WHEN** um pedido de consulta chega sem credencial ou com credencial inválida ou expirada
+- **THEN** o sistema recusa o pedido com o código de erro de não autenticado, sem revelar se a conta existe
+
+#### Scenario: Banco do Accounts indisponível na consulta
+- **WHEN** uma pessoa autenticada consulta uma conta enquanto o banco do próprio Accounts está indisponível
+- **THEN** o sistema responde com o código de erro de serviço temporariamente indisponível, em vez de devolver dado
+  desatualizado
 
 ### Requirement: Evento de conta aberta
 O sistema SHALL publicar um evento de conta aberta para toda conta criada, somente se a criação foi confirmada, e
@@ -270,6 +291,15 @@ schema, e MUST NOT trazer dados pessoais (CPF, nome, e-mail).
 #### Scenario: Evento sem dados pessoais
 - **WHEN** um evento de conta aberta é publicado
 - **THEN** ele não contém CPF, nome nem nenhum outro dado pessoal do titular
+
+### Requirement: Visibilidade de eventos não publicados
+O sistema SHALL tornar visível para a operação a quantidade de eventos de conta aberta gravados e ainda não publicados
+no canal de eventos.
+
+#### Scenario: Eventos aguardando o canal de eventos
+- **WHEN** contas são abertas enquanto o canal de eventos está indisponível
+- **THEN** a quantidade de eventos não publicados cresce a cada conta aberta e volta a zero quando os eventos são
+  publicados
 
 ### Requirement: Proteção de dados pessoais
 O sistema SHALL tratar o CPF e os demais dados pessoais do titular conforme a LGPD. Eles MUST NOT aparecer em texto

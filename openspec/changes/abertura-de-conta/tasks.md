@@ -74,18 +74,26 @@
   - o token de `ana` obtido com `kipay-cli` traz os claims `email` e `aud` contendo `accounts`;
   - o token de `sem-email` é emitido sem `invalid_grant` e não traz `email`.
 - [ ] 2.5 Criar `.github/workflows/ci.yml` (D13). Verificação: o workflow roda verde no GitHub depois do push.
+- [ ] 2.6 Fixar `management.tracing.sampling.probability=1.0` no `application.yml` dos dois serviços (D12).
+  Verificação: em cada serviço, um teste confirma que o valor efetivo de `management.tracing.sampling.probability` no
+  contexto é `1.0`.
 
 ## 3. Segurança do Accounts (contas: "Abertura de conta por pessoa física autenticada"; Artigo IX)
 
 - [ ] 3.1 No Accounts, criar o `@RestControllerAdvice` base com `ProblemDetail` e a propriedade `code`, incluindo
-  `VALIDATION_ERROR` com a lista de campos (D3). Criar também o `SecurityFilterChain` de resource server com validação
-  de issuer e audiência, e um `AuthenticationEntryPoint` que responde `401` no mesmo formato (D9). Verificação:
+  `VALIDATION_ERROR` com a lista de campos e o banco indisponível como `503 SERVICE_UNAVAILABLE` (D3). Criar também o
+  `SecurityFilterChain` de resource server com validação de issuer e audiência, e um `AuthenticationEntryPoint` que
+  responde `401` no mesmo formato, com o `code` `AUTHENTICATION_REQUIRED` (D3, D9). Liberar o `/v3/api-docs/**` sem
+  token, para o springdoc que entra na 5.3 (D3). Verificação:
   - um teste confirma o formato RFC 9457 e o `code` de um erro de validação;
-  - testes MockMvc mostram que uma requisição sem token, com token expirado ou com audiência errada recebe `401` em
-    `ProblemDetail`;
+  - um teste confirma que uma falha de acesso ao banco vira `503` em `ProblemDetail` com o `code` `SERVICE_UNAVAILABLE`;
+  - testes MockMvc com tokens assinados no próprio teste (D9) mostram que uma requisição sem token, com token expirado,
+    de outra audiência, de outro issuer ou com assinatura inválida recebe `401` em `ProblemDetail` com o `code`
+    `AUTHENTICATION_REQUIRED`, e que um token válido passa;
+  - uma rota qualquer sob `/v3/api-docs/**` não recebe `401` (o caminho está liberado), e outra rota sem token recebe;
   - o health e o Prometheus da porta de management continuam respondendo sem token.
 
-  > **Plan mode recomendado** — foco: issuer, audiência e `401` em `ProblemDetail` sem bloquear a porta de management. Prompt sugerido: CLAUDE.md, seção "Modo plan".
+  > **Plan mode recomendado** — foco: issuer, audiência, tokens assinados no teste e `401` em `ProblemDetail` sem bloquear a porta de management. Prompt sugerido: CLAUDE.md, seção "Modo plan".
 
 ## 4. Domínio do Accounts (contas)
 
@@ -116,28 +124,38 @@
   `traceparent` (D6). Requisito: "Evento de conta aberta". Verificação: um teste de integração confirma que o
   `OutboxWriter` fora de uma transação falha, e que um rollback da transação do agregado não deixa linha no Outbox.
 - [ ] 5.2 Implementar o `OutboxRelay` (`FOR UPDATE SKIP LOCKED`, envio com `CompletableFuture`, `published_at`, gauge
-  `outbox.pending`) e o `NewTopic` de `accounts.account-opened` (D5, D6, D12). Requisito: "Evento de conta aberta",
-  cenário "Conta criada gera evento". Verificação: um teste com Testcontainers Kafka confirma que o evento chega ao
-  tópico com a chave `accountId`, o envelope completo e o mesmo `traceId` da requisição. Outro teste confirma que, com o
-  Kafka parado, o evento continua pendente e é publicado quando o Kafka volta.
+  `outbox.pending`) e o `NewTopic` de `accounts.account-opened`, e ligar `spring.kafka.template.observation-enabled`
+  (D5, D6, D12). Requisitos: "Evento de conta aberta", cenário "Conta criada gera evento", e "Visibilidade de eventos
+  não publicados". Verificação:
+  - um teste com Testcontainers Kafka confirma que o evento chega ao tópico com a chave `accountId`, o envelope
+    completo e, no header `traceparent`, o `traceId` da observação aberta pelo teste ao gravar o evento no Outbox (o
+    `POST /accounts` só nasce na 5.3);
+  - outro teste confirma que, com o Kafka parado, o evento continua pendente e `outbox.pending` cresce, e que o evento
+    é publicado e `outbox.pending` volta a zero quando o Kafka volta.
 
   > **Plan mode recomendado** — foco: lock `FOR UPDATE SKIP LOCKED`, timeout do envio e propagação do `traceparent`. Prompt sugerido: CLAUDE.md, seção "Modo plan".
 
 - [ ] 5.3 Implementar e documentar no OpenAPI o `POST /accounts` (`{fullName, cpf, birthDate}`, com `email` do claim).
   O `AccountOpeningService` e a migration de `idempotency_records` seguem D3 e D4, com o `INSERT` da chave como
-  primeiro comando da transação. Requisitos: "Abertura de conta por pessoa física autenticada" e "Idempotência da
-  abertura". Verificação: testes de integração (MockMvc com `jwt()` e Testcontainers) para:
-  - abertura aceita (`201`, `Location`, status `PENDING` e e-mail do claim gravado);
+  primeiro comando da transação. Acrescentar o springdoc (ADR-0006). Requisitos: "Abertura de conta por pessoa física
+  autenticada" e "Idempotência da abertura". Verificação: um teste confirma que o `/v3/api-docs` responde `200` sem
+  token, com um documento OpenAPI válido, no Boot 4.1 com o Jackson 3. Testes de integração (MockMvc com `jwt()` e
+  Testcontainers) para:
+  - abertura aceita (`201`, `Location`, status `PENDING` e e-mail do claim gravado), com o `AccountOpened` gravado
+    levando no `traceparent` o `traceId` da requisição;
+  - pedido sem token (`401 AUTHENTICATION_REQUIRED`, nenhuma conta criada);
   - token sem `email` (`422 IDENTITY_EMAIL_MISSING`);
   - repetição com a mesma chave;
-  - repetição de recusa;
+  - repetição de recusa (`409`, `422` e `400 VALIDATION_ERROR`), inclusive menor de idade repetido com a mesma chave depois de o `Clock`
+    passar do 18º aniversário (mesma `422 ACCOUNT_HOLDER_UNDERAGE`, nenhuma conta criada);
+  - banco do Accounts indisponível (`503 SERVICE_UNAVAILABLE`, sem registro de idempotência);
   - chave com conteúdo diferente;
   - chave ausente (`IDEMPOTENCY_KEY_MISSING`);
   - chave em formato inválido (`IDEMPOTENCY_KEY_INVALID`);
   - mesma chave por identidades diferentes;
   - criação com o Kafka indisponível;
   - um teste confirma que `/v3/api-docs` lista o `POST /accounts`, o corpo, o header `Idempotency-Key` e as respostas
-    `201`, `400`, `401`, `409`, `422`.
+    `201`, `400`, `401`, `409`, `422` e `503`.
 
   Cada teste de abertura confirma também a quantidade de contas e de linhas no Outbox.
 
@@ -167,8 +185,11 @@
 - [ ] 5.5 Implementar e documentar no OpenAPI o `GET /accounts/{accountId}`, com autorização por `owner_subject` e
   CPF mascarado (D3, D9). Requisitos: "Consulta da própria conta" e "Conta não ativa não movimenta dinheiro"
   (`canMoveMoney` na resposta). Verificação:
-  - testes de integração para a própria conta, conta de outro `sub` (`404 ACCOUNT_NOT_FOUND`) e conta inexistente;
-  - um teste confirma o endpoint e o `404` no `/v3/api-docs`.
+  - testes de integração para a própria conta (com `openedAt` e `activatedAt`), conta de outro `sub`
+    (`404 ACCOUNT_NOT_FOUND`), conta inexistente, pedido sem token (`401 AUTHENTICATION_REQUIRED`, idêntico para um id
+    existente e para um inexistente, para não revelar se a conta existe) e banco do Accounts indisponível
+    (`503 SERVICE_UNAVAILABLE`);
+  - um teste confirma o endpoint e as respostas `401`, `404` e `503` no `/v3/api-docs`.
 - [ ] 5.6 Garantir a proteção de dados pessoais nos logs e erros (D12). Requisito: "Proteção de dados pessoais".
   Verificação: testes com `OutputCaptureExtension` executam abertura aceita, CPF inválido, menor de idade e CPF já
   cadastrado. Eles confirmam que o CPF (com e sem pontuação), o nome, a data de nascimento e o e-mail não aparecem nos
@@ -179,13 +200,22 @@
 - [ ] 6.1 Implementar `LedgerAccount` (id UUID v7) e a migration de `ledger_accounts`, com `account_id` UNIQUE e sem
   coluna de saldo (D8). Requisito: "Criação da conta contábil a partir da conta aberta". Verificação: um teste de
   repositório com Testcontainers confirma a unicidade, e um teste de schema confirma que não há coluna de saldo.
-- [ ] 6.2 Implementar no Ledger o `OutboxWriter`, o `OutboxRelay` e o `NewTopic` de `ledger.ledger-account-created`
-  (D5, D6). Requisito: "Confirmação da criação da conta contábil". Verificação: testes equivalentes aos de 5.1 e 5.2.
+- [ ] 6.2 Implementar no Ledger o `OutboxWriter`, o `OutboxRelay` e o `NewTopic` de `ledger.ledger-account-created`,
+  e ligar `spring.kafka.template.observation-enabled` (D5, D6, D12). Requisitos: "Confirmação da criação da conta
+  contábil" e "Visibilidade de confirmações não publicadas". Verificação:
+  - um teste de integração confirma que o `OutboxWriter` fora de uma transação falha, e que um rollback da transação
+    do agregado não deixa linha no Outbox;
+  - um teste com Testcontainers Kafka confirma que o `LedgerAccountCreated` chega ao tópico com a chave `accountId`, o
+    envelope completo e, no header `traceparent`, o `traceId` da observação aberta pelo teste ao gravar o evento no
+    Outbox (o listener que dá origem ao trace real só nasce na 6.3);
+  - outro teste confirma que, com o Kafka parado, o evento continua pendente e `outbox.pending` cresce, e que o evento
+    é publicado e `outbox.pending` volta a zero quando o Kafka volta.
 
   > **Plan mode recomendado** — foco: reaproveitar o desenho de 5.1 e 5.2 no Ledger, sem biblioteca compartilhada. Prompt sugerido: CLAUDE.md, seção "Modo plan".
 
 - [ ] 6.3 Implementar o `AccountOpenedListener` com `processed_events`, `INSERT ... ON CONFLICT (account_id) DO NOTHING`
-  em `ledger_accounts`, o `DefaultErrorHandler` e a DLT `accounts.account-opened.dlt` (D7). Requisitos: "Criação da
+  em `ledger_accounts`, o `DefaultErrorHandler` e a DLT `accounts.account-opened.dlt` (D7), e ligar
+  `spring.kafka.listener.observation-enabled` (D12). Requisitos: "Criação da
   conta contábil a partir da conta aberta", "Uma única conta contábil por conta", "Confirmação da criação da conta
   contábil" e "Eventos inválidos não bloqueiam o processamento". Verificação: testes com Testcontainers Kafka para:
   - evento recebido (uma `LedgerAccount` e um `LedgerAccountCreated` no Outbox);
@@ -196,30 +226,35 @@
   - eventos publicados com o listener parado, processados todos quando ele sobe (cenário "Livro-razão indisponível por
     um período");
   - `schemaVersion` desconhecida e payload inválido (vão para a DLT e o evento seguinte é processado);
-  - falha temporária do banco (nova tentativa).
+  - falha temporária do banco (nova tentativa);
+  - falha persistente do banco (com o banco do Ledger indisponível em todas as tentativas, o evento vai para a DLT
+    depois das 3 tentativas, sem conta contábil, e o evento seguinte é processado quando o banco volta);
+  - trace contínuo: um `AccountOpened` publicado com `traceparent` é processado com o mesmo `traceId` (linha de log do
+    listener), e o `LedgerAccountCreated` gravado no Outbox leva esse mesmo `traceId` no `traceparent`.
 
-  > **Plan mode recomendado** — foco: `ON CONFLICT`, `processed_events`, DLT e os sete cenários de teste. Prompt sugerido: CLAUDE.md, seção "Modo plan".
+  > **Plan mode recomendado** — foco: `ON CONFLICT`, `processed_events`, DLT e os nove cenários de teste. Prompt sugerido: CLAUDE.md, seção "Modo plan".
 
 ## 7. Ativação no Accounts (contas)
 
 - [ ] 7.1 Implementar o `LedgerAccountCreatedListener` com `processed_events` e a DLT
-  `ledger.ledger-account-created.dlt` (D7). Requisito: "Ativação após a confirmação do livro-razão". Verificação: testes
-  com Testcontainers Kafka para:
+  `ledger.ledger-account-created.dlt` (D7), e ligar `spring.kafka.listener.observation-enabled` (D12). Requisito:
+  "Ativação após a confirmação do livro-razão". Verificação: testes com Testcontainers Kafka para:
   - confirmação recebida (`ACTIVE` e `activated_at` preenchido);
   - confirmação duplicada (`activated_at` inalterado);
   - conta desconhecida (DLT, sem bloquear a seguinte);
-  - conta sem confirmação (continua `PENDING`, sem nenhuma alteração automática).
+  - conta sem confirmação (continua `PENDING`, sem nenhuma alteração automática);
+  - trace contínuo: uma confirmação publicada com `traceparent` é processada com o mesmo `traceId` (linha de log do
+    listener).
 
   > **Plan mode recomendado** — foco: ativação idempotente e conta desconhecida na DLT. Prompt sugerido: CLAUDE.md, seção "Modo plan".
 
-- [ ] 7.2 Expor o gauge `accounts.pending.stale` (limite `kipay.accounts.pending-stale-threshold`, padrão `10m`) e o
-  contador `accounts.opening.requests` (D12). Requisito: "Visibilidade de contas pendentes". Verificação: um teste com
+- [ ] 7.2 Expor o gauge `accounts.pending.stale` (limite `kipay.accounts.pending-stale-threshold`, padrão `10m`)
+  (D12). Requisito: "Visibilidade de contas pendentes". Verificação: um teste com
   `Clock` controlado confirma no `/actuator/prometheus` da porta de management:
   - uma conta com 9 minutos não entra em `accounts.pending.stale`;
   - uma conta com 11 minutos entra;
   - depois da ativação, ela sai;
-  - com o limite configurado em `5m`, a contagem muda sem alterar o código;
-  - o contador `accounts.opening.requests` registra os resultados por `outcome`.
+  - com o limite configurado em `5m`, a contagem muda sem alterar o código.
 
 ## 8. Testes de contrato (Artigo VII; D10, conforme a ADR-0006)
 
@@ -248,7 +283,8 @@
   - tenta abrir conta com `sem-email` (`IDENTITY_EMAIL_MISSING`).
 
   Verificação: com o `docker compose up`, o script termina com código 0, e o `traceId` da abertura aparece nos logs do
-  Accounts e do Ledger.
+  Accounts e do Ledger. O token real do Keycloak aceito pelo Accounts cobre a busca de chaves pelo `issuer-uri`, que os
+  testes de `401` (tokens assinados no teste) não exercitam (D9).
 - [ ] 9.2 Atualizar o `README.md` (status, como subir o ambiente, como rodar o smoke test) e montar a tabela de
   rastreabilidade cenário → teste nesta change. Verificação: todo cenário das duas specs tem pelo menos um teste
   listado, e `mvn verify` na raiz passa.

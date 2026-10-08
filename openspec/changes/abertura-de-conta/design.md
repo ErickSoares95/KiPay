@@ -82,7 +82,8 @@ nos dois serviços, e `spring-security-test` só no Accounts.
 
 - Identificadores: todas as chaves primárias geradas pelo sistema (`account_holders`, `accounts`, `outbox_events`) são
   **UUID v7**, gerados na aplicação. O UUID v7 é ordenável no tempo, o que mantém o índice B-tree compacto, ao
-  contrário do v4 aleatório. A `Idempotency-Key` do cliente aceita qualquer versão de UUID.
+  contrário do v4 aleatório. A geração usa o Hibernate 7 do BOM do Boot (`@UuidGenerator(style = VERSION_7)`), sem
+  biblioteca fora dos BOMs. A `Idempotency-Key` do cliente aceita qualquer versão de UUID.
 - `account_holders`: `id` (UUID v7), `cpf` (CHAR(11), **UNIQUE**, constraint `uk_account_holders_cpf`),
   `owner_subject` (o `sub` do JWT, **UNIQUE**, constraint `uk_account_holders_owner_subject`), `full_name`
   (VARCHAR(200)), `birth_date` (DATE), `email` (VARCHAR(320), do claim `email` do token) e `created_at`. Esse par de
@@ -111,14 +112,20 @@ nos dois serviços, e `spring-security-test` só no Accounts.
 
 | Método e caminho | Sucesso | Erros (`code`) |
 |---|---|---|
-| `POST /accounts` (header `Idempotency-Key`: UUID; corpo `{fullName, cpf, birthDate}`) | `201 Created`, `Location: /accounts/{accountId}`, corpo `{accountId, status, cpf (mascarado), canMoveMoney, openedAt}` | `400 IDEMPOTENCY_KEY_MISSING`, `400 IDEMPOTENCY_KEY_INVALID` (não é UUID), `400 VALIDATION_ERROR` (lista os campos), `422 ACCOUNT_INVALID_CPF`, `422 ACCOUNT_HOLDER_UNDERAGE`, `422 IDENTITY_EMAIL_MISSING`, `409 ACCOUNT_ALREADY_OPEN`, `409 ACCOUNT_CPF_ALREADY_REGISTERED`, `409 ACCOUNT_IDENTITY_ALREADY_LINKED`, `422 IDEMPOTENCY_KEY_REUSED`, `409 IDEMPOTENCY_REQUEST_IN_PROGRESS`, `401` |
-| `GET /accounts/{accountId}` | `200`, corpo `{accountId, status, cpf (mascarado), canMoveMoney, openedAt, activatedAt}` | `404 ACCOUNT_NOT_FOUND` (também para conta de outro `sub`), `401` |
+| `POST /accounts` (header `Idempotency-Key`: UUID; corpo `{fullName, cpf, birthDate}`) | `201 Created`, `Location: /accounts/{accountId}`, corpo `{accountId, status, cpf (mascarado), canMoveMoney, openedAt}` | `400 IDEMPOTENCY_KEY_MISSING`, `400 IDEMPOTENCY_KEY_INVALID` (não é UUID), `400 VALIDATION_ERROR` (lista os campos), `422 ACCOUNT_INVALID_CPF`, `422 ACCOUNT_HOLDER_UNDERAGE`, `422 IDENTITY_EMAIL_MISSING`, `409 ACCOUNT_ALREADY_OPEN`, `409 ACCOUNT_CPF_ALREADY_REGISTERED`, `409 ACCOUNT_IDENTITY_ALREADY_LINKED`, `422 IDEMPOTENCY_KEY_REUSED`, `409 IDEMPOTENCY_REQUEST_IN_PROGRESS`, `401 AUTHENTICATION_REQUIRED`, `503 SERVICE_UNAVAILABLE` |
+| `GET /accounts/{accountId}` | `200`, corpo `{accountId, status, cpf (mascarado), canMoveMoney, openedAt, activatedAt}` | `404 ACCOUNT_NOT_FOUND` (também para conta de outro `sub`), `401 AUTHENTICATION_REQUIRED`, `503 SERVICE_UNAVAILABLE` |
 
 - Os erros saem em `ProblemDetail` (`spring.mvc.problemdetails.enabled=true` e um `@RestControllerAdvice` que estende
   `ResponseEntityExceptionHandler`), com a propriedade `code`. O `401` também sai em `ProblemDetail`, por meio de um
-  `AuthenticationEntryPoint` próprio.
+  `AuthenticationEntryPoint` próprio, sempre com o `code` `AUTHENTICATION_REQUIRED`: token ausente, expirado ou com
+  audiência errada recebem a mesma resposta, sem que o corpo revele o motivo da recusa.
+- Com o banco do Accounts indisponível (falha de conexão ou tempo esgotado no acesso ao banco), a resposta é
+  `503 SERVICE_UNAVAILABLE` em `ProblemDetail`. Nada é gravado, nem a chave de idempotência, e o cliente repete o
+  pedido com a mesma chave (spec, "Decisões de consistência").
 - A API é documentada pelo springdoc em `/v3/api-docs`. Cada endpoint nasce documentado, com corpo, headers e códigos
-  de erro, na mesma tarefa que o implementa.
+  de erro, na mesma tarefa que o implementa. O springdoc entra com o `POST /accounts` (5.3), como diz a ADR-0006. O
+  `/v3/api-docs/**` fica liberado sem token na porta da aplicação, pelo `SecurityFilterChain` da 3.1: só documenta a
+  API e não expõe dados. A interface do Swagger UI não é liberada, porque nenhum requisito a pede.
 - Ordem das verificações de negócio, antes de gravar:
   1. claim `email` presente;
   2. CPF válido;
@@ -167,18 +174,24 @@ Fluxo do `AccountOpeningService`:
 
    Como a chave é reservada primeiro, dois pedidos idênticos nunca chegam às constraints de `account_holders` ao mesmo
    tempo. Isso evita que o segundo receba um `409` de CPF sobre uma chave que já tem `201`.
-4. As recusas de unicidade de D3 (`ACCOUNT_ALREADY_OPEN`, `ACCOUNT_CPF_ALREADY_REGISTERED` ou
-   `ACCOUNT_IDENTITY_ALREADY_LINKED`) são gravadas em `idempotency_records` com a resposta `409`, para que a repetição
-   devolva a mesma recusa. Há dois caminhos:
-   - **Recusa na verificação prévia** (verificações 4 e 5 de D3, antes de qualquer gravação): a transação de abertura
-     não chega a começar. Uma transação curta grava direto o `idempotency_records` com o `409`.
+4. As recusas de negócio são gravadas em `idempotency_records` com a resposta da recusa, para que a repetição devolva a
+   mesma recusa mesmo depois de a condição mudar (por exemplo, o titular completar 18 anos). São elas os `422` das
+   verificações 1 a 3 de D3 (`IDENTITY_EMAIL_MISSING`, `ACCOUNT_INVALID_CPF` e `ACCOUNT_HOLDER_UNDERAGE`) e os `409` de
+   unicidade (`ACCOUNT_ALREADY_OPEN`, `ACCOUNT_CPF_ALREADY_REGISTERED` ou `ACCOUNT_IDENTITY_ALREADY_LINKED`). Há dois
+   caminhos:
+   - **Recusa na verificação prévia** (verificações 1 a 5 de D3, antes de qualquer gravação): a transação de abertura
+     não chega a começar. Uma transação curta grava direto o `idempotency_records` com o `422` ou o `409`.
    - **Violação de constraint durante a abertura**: a transação de abertura é desfeita, inclusive a reserva da chave.
      Uma nova transação refaz as verificações 4 e 5 de D3 para decidir o código e grava o `idempotency_records` com o
      `409`.
 
    Nos dois caminhos, se o `INSERT` da chave violar a PK, vale o passo 3.
-5. Erros de validação (`400` e os `422` de CPF inválido, menor de idade e identidade sem e-mail) não são gravados: o
-   pedido não foi processado, e o cliente pode corrigi-lo.
+5. O `400 VALIDATION_ERROR` também é gravado, desde que a identidade e a chave sejam válidas: uma data de nascimento
+   futura, por exemplo, vira `422` quando a data passa, e a mesma chave deve devolver sempre a mesma resposta. Não são
+   gravados: a chave ausente ou inválida (`IDEMPOTENCY_KEY_MISSING` e `IDEMPOTENCY_KEY_INVALID`), porque não há chave
+   para reservar; o `401`, porque não há identidade; e o `503`, porque a transação não aconteceu e o cliente deve
+   repetir com a mesma chave. Corrigir um pedido recusado muda o conteúdo e, portanto, exige uma nova chave
+   (`IDEMPOTENCY_KEY_REUSED` na mesma chave).
 
 - Alternativa descartada: **registro "em processamento" confirmado antes da operação, numa transação própria**. Exige
   uma máquina de estados e um tratamento de registros órfãos. Aqui, a reserva da chave e a operação estão na mesma
@@ -226,7 +239,8 @@ evento está pendente).
   `CompletableFuture` com timeout. Em seguida, grava `published_at`.
 - O producer usa `acks=all` e idempotência ativada. A entrega é pelo menos uma vez: os duplicados possíveis são
   tratados pelo consumidor (D7).
-- Gauge `outbox.pending` (quantidade de eventos não publicados).
+- Gauge `outbox.pending` (quantidade de eventos não publicados), nos requisitos "Visibilidade de eventos não
+  publicados" (contas) e "Visibilidade de confirmações não publicadas" (contas-contabeis).
 - Alternativa descartada: **Debezium (CDC)**. Exige Kafka Connect, mais uma tecnologia para operar (Artigo X).
 - Alternativa descartada: **Spring Modulith (event publication registry e externalização)**. É uma dependência nova
   com outro modelo mental, e o ganho é pequeno para duas tabelas e um agendador.
@@ -288,10 +302,16 @@ traz o `SecurityFilterChain` e a validação do token, como prevê a ADR-0005.
   Toda mudança no realm passa por um novo export, nunca por edição manual do JSON. As senhas dos usuários de teste são
   só para o ambiente local e ficam documentadas em `infra/README.md`, junto com o passo a passo do export.
 - No Accounts, um bean `SecurityFilterChain` usa `authorizeHttpRequests` e a DSL com lambdas, com
-  `oauth2ResourceServer(jwt)`, `issuer-uri` do realm e validação da audiência `accounts`.
+  `oauth2ResourceServer(jwt)`, `issuer-uri` do realm e validação da audiência `accounts`. Só o `/v3/api-docs/**` é liberado sem
+  token (D3).
 - A sessão é stateless, e o CSRF fica desligado só porque não há cookies.
 - Autorização por recurso: o `AccountQueryService` busca por (`accountId`, `owner_subject` = `sub`).
-- Os testes de API usam `SecurityMockMvcRequestPostProcessors.jwt()`, sem `@MockitoBean` do `JwtDecoder`.
+- Os testes de negócio da API usam `SecurityMockMvcRequestPostProcessors.jwt()`, sem `@MockitoBean` do `JwtDecoder`.
+- Os testes de `401` precisam passar pelo decoder e pelos validadores, que o `jwt()` pula. Eles geram um par de chaves
+  RSA, assinam tokens com `NimbusJwtEncoder` (válido, expirado, de outra audiência, de outro issuer e assinado com
+  outra chave) e usam um `JwtDecoder` de teste (`NimbusJwtDecoder.withPublicKey`) com o mesmo validador da produção,
+  exposto por um método da configuração de segurança. Não há dependência nova: o `NimbusJwtEncoder` vem com o starter
+  de resource server. A busca das chaves pelo `issuer-uri` fica coberta pelo smoke test (tarefa 9.1).
 - Alternativa descartada: **container de Keycloak nos testes automatizados (módulo de terceiros do Testcontainers)**.
   Seria mais uma dependência e deixaria os testes mais lentos. O caminho real com o Keycloak é coberto pelo smoke test
   (tarefa 9.1).
@@ -362,18 +382,25 @@ e os testes de contrato protegem a compatibilidade. A decisão de criar uma bibl
 - `logging.structured.format.console=ecs`. O `traceId` e o `spanId` entram via MDC do Micrometer Tracing.
 - Nenhum corpo de requisição é logado. `Cpf.toString()` sai mascarado.
 - `spring-boot-starter-opentelemetry` com a exportação desligada até a feature 8.
+- Amostragem fixa em `management.tracing.sampling.probability=1.0` nos dois serviços, para que todo trace do ambiente
+  local e do smoke test fique completo. O padrão do Boot (`0.1`) descartaria 9 em cada 10 traces quando a exportação
+  for ligada. Outro valor é aplicado pela variável de ambiente `MANAGEMENT_TRACING_SAMPLING_PROBABILITY`, sem
+  configuração extra; o valor de produção é decidido na feature 8.
 - Propagação por Kafka com `spring.kafka.template.observation-enabled` e `spring.kafka.listener.observation-enabled`.
 - Para atravessar o Outbox, o `OutboxWriter` grava o `traceparent` corrente. O `OutboxRelay` abre o envio como filho
   desse contexto, para que o trace da requisição continue no consumidor.
-- Métricas RED pelo `http.server.requests` e pelas observações do Kafka, além de:
-  - `accounts.opening.requests` (tag `outcome`);
-  - gauge `accounts.pending.stale`: quantidade de contas PENDENTE com `opened_at` anterior a
-    `now - kipay.accounts.pending-stale-threshold` (padrão `10m`, ajustável por configuração). O `Clock` é injetado
-    para os testes.
+- Métricas RED pelo `http.server.requests` e pelas observações do Kafka, além do `outbox.pending` (D6) e do gauge
+  `accounts.pending.stale`: quantidade de contas PENDENTE com `opened_at` anterior a
+  `now - kipay.accounts.pending-stale-threshold` (padrão `10m`, ajustável por configuração). O `Clock` é injetado para
+  os testes.
 
   Não há cancelamento automático, e as contas continuam PENDENTE. Outras métricas de pendência (total e idade da mais
   antiga) só entram quando algum requisito pedir.
-- Health checks do Actuator (`db`, `kafka`) com os grupos `liveness` e `readiness`.
+- Health checks do Actuator com os grupos `liveness` (só `livenessState`) e `readiness` (`readinessState` e `db`).
+  Não há health indicator de Kafka: o Spring Boot 4.1 não traz um, e a abertura de conta é AP em relação ao canal de
+  eventos (spec de contas, "Decisões de consistência"). Uma dependência que a consistência declarada tolera fora do ar
+  não entra na readiness, senão o Kafka parado tiraria o serviço do balanceamento e recusaria pedidos que deveriam ser
+  aceitos. A indisponibilidade do Kafka aparece no gauge `outbox.pending`, que cresce enquanto os eventos não saem.
 - **O Actuator fica numa porta de management separada** (`management.server.port`: 9081 no Accounts e 9082 no Ledger).
   Essa porta não é publicada para fora da rede do Compose. O `SecurityFilterChain` do Accounts protege a porta da
   aplicação. Na porta de management, os endpoints expostos (`health`, `prometheus`) são liberados com
@@ -409,7 +436,10 @@ Antes do código, entram em `docs/dominio/glossario.md`:
 - Data de nascimento → `birthDate`;
 - E-mail → `email`;
 - Idade mínima → `minimumAge`;
-- Conta pendente além do limite → `stale pending account` (`accounts.pending.stale`).
+- Conta pendente além do limite → `stale pending account` (`accounts.pending.stale`);
+- Eventos não publicados → `outbox.pending`;
+- Não autenticado → `AUTHENTICATION_REQUIRED`;
+- Serviço temporariamente indisponível → `SERVICE_UNAVAILABLE`.
 
 ## Risks / Trade-offs
 

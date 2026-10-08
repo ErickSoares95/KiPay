@@ -42,10 +42,10 @@ Outbox, consumidor idempotente e unicidade de CPF (`docs/arquitetura/visao-geral
 
 - `contas`: cadastro do titular e ciclo de vida da conta no Accounts. Cobre a abertura, os dados obrigatórios e a
   idade mínima, a unicidade de CPF, o vínculo entre identidade e CPF, a idempotência da abertura, a ativação após a
-  confirmação do Ledger, a visibilidade de contas pendentes, a consulta da própria conta e a regra de que conta não
-  ATIVA não movimenta dinheiro.
-- `contas-contabeis`: criação, no Ledger, da conta contábil de cada conta aberta, de forma idempotente, e confirmação
-  ao Accounts.
+  confirmação do Ledger, a visibilidade de contas pendentes e de eventos não publicados, a consulta da própria conta e
+  a regra de que conta não ATIVA não movimenta dinheiro.
+- `contas-contabeis`: criação, no Ledger, da conta contábil de cada conta aberta, de forma idempotente, confirmação
+  ao Accounts e visibilidade das confirmações não publicadas.
 
 ### Modified Capabilities
 
