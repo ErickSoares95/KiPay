@@ -60,7 +60,8 @@
   aplicação. Outro teste confirma que uma linha de log capturada (`OutputCaptureExtension`) é JSON e contém `traceId`.
 - [x] 2.3 Criar `infra/docker-compose.yml` (sem Keycloak), com `accounts-db`, `ledger-db`, `kafka`, `accounts` e
   `ledger`, e o `.env.example` (D13). Criar um Dockerfile multi-stage por serviço (build com Maven e Temurin 25, a
-  partir da raiz do monorepo por causa do POM agregador, e runtime com JRE 25), que o Compose usa para gerar as imagens
+  partir da raiz do monorepo com `mvn -f services/<nome>/pom.xml`, sem depender do POM agregador, e runtime com JRE 25
+  Alpine), que o Compose usa para gerar as imagens
   de `accounts` e `ledger` (D13). Nos dois serviços, configurar também (D12):
   - o grupo `readiness` com `readinessState` e `db`, e o grupo `liveness` com só `livenessState`;
   - `management.tracing.sampling.probability=1.0` no `application.yml`.

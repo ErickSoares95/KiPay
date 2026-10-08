@@ -420,8 +420,9 @@ e os testes de contrato protegem a compatibilidade. A decisão de criar uma bibl
   - `kafka` (imagem `apache/kafka`, KRaft, um nó);
   - `keycloak` (porta 8080), acrescentado na tarefa do realm (2.4);
   - `accounts` (8081) e `ledger` (8082), com as portas de management (9081 e 9082) só na rede interna. A imagem de
-    cada um vem de um `Dockerfile` multi-stage em `services/<nome>/` (contexto de build na raiz, por causa do POM
-    agregador); o healthcheck usa `/actuator/health/readiness` na porta de management.
+    cada um vem de um `Dockerfile` multi-stage em `services/<nome>/` (contexto de build na raiz do monorepo, com
+    `mvn -f services/<nome>/pom.xml`, pois cada serviço tem o Spring Boot como pai e não depende do POM agregador;
+    runtime em JRE 25 Alpine, que traz `wget` para o healthcheck); o healthcheck usa `/actuator/health/readiness` na porta de management.
 - Versões de imagem fixadas.
 - Os segredos vêm de `.env`, que fica fora do Git. Um `.env.example` vai versionado.
 - Os tópicos são criados pelas aplicações com beans `NewTopic` (3 partições).
