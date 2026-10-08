@@ -54,7 +54,7 @@
   do Jackson 3 e virtual threads. Verificação: em cada serviço, um teste `@SpringBootTest` com PostgreSQL e Kafka via
   Testcontainers (`@ServiceConnection`) sobe o contexto, e o health da porta de management responde `UP`. O
   `mvn verify` na raiz builda e testa os dois.
-- [ ] 2.2 Configurar a observabilidade de base nos dois serviços (D12): logs ECS, tracing com a exportação desligada,
+- [x] 2.2 Configurar a observabilidade de base nos dois serviços (D12): logs ECS, tracing com a exportação desligada,
   Prometheus e Actuator na porta de management separada (`management.server.port`). Verificação: um teste confirma
   que `/actuator/prometheus` responde na porta de management, expõe `http_server_requests` e não responde na porta da
   aplicação. Outro teste confirma que uma linha de log capturada (`OutputCaptureExtension`) é JSON e contém `traceId`.
