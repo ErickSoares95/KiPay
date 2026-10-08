@@ -43,7 +43,7 @@ class AccountsApplicationTests {
     }
 
     @Test
-    @DisplayName("o health da porta de management responde UP com PostgreSQL e Kafka do Testcontainers")
+    @DisplayName("o health da porta de management responde UP com o PostgreSQL do Testcontainers")
     void managementHealthIsUp() throws Exception {
         HttpResponse<String> response;
         try (HttpClient client = HttpClient.newHttpClient()) {
@@ -62,7 +62,8 @@ class AccountsApplicationTests {
         try (Connection connection = flyway.getConfiguration().getDataSource().getConnection()) {
             assertThat(connection.getMetaData().getDatabaseProductName()).isEqualTo("PostgreSQL");
         }
-        assertThat(flyway.info()).isNotNull();
+        assertThat(flyway.getConfiguration().getLocations()).extracting(Object::toString)
+                .contains("classpath:db/migration");
     }
 
     @Test

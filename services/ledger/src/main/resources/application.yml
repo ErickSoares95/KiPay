@@ -8,8 +8,6 @@ spring:
     open-in-view: false
     hibernate:
       ddl-auto: validate
-  flyway:
-    locations: classpath:db/migration
 
 server:
   port: 8082
@@ -25,8 +23,15 @@ management:
     health:
       probes:
         enabled: true
+      group:
+        readiness:
+          include: readinessState,db
+        liveness:
+          include: livenessState
   # Exportação OTLP (traces, logs e métricas) desligada até a feature 8 (D12). O tracing segue ativo: traceId e spanId no MDC.
   tracing:
+    sampling:
+      probability: 1.0
     export:
       otlp:
         enabled: false

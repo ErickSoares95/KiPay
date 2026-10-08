@@ -58,7 +58,7 @@
   Prometheus e Actuator na porta de management separada (`management.server.port`). Verificação: um teste confirma
   que `/actuator/prometheus` responde na porta de management, expõe `http_server_requests` e não responde na porta da
   aplicação. Outro teste confirma que uma linha de log capturada (`OutputCaptureExtension`) é JSON e contém `traceId`.
-- [ ] 2.3 Criar `infra/docker-compose.yml` (sem Keycloak), com `accounts-db`, `ledger-db`, `kafka`, `accounts` e
+- [x] 2.3 Criar `infra/docker-compose.yml` (sem Keycloak), com `accounts-db`, `ledger-db`, `kafka`, `accounts` e
   `ledger`, e o `.env.example` (D13). Criar um Dockerfile multi-stage por serviço (build com Maven e Temurin 25, a
   partir da raiz do monorepo por causa do POM agregador, e runtime com JRE 25), que o Compose usa para gerar as imagens
   de `accounts` e `ledger` (D13). Nos dois serviços, configurar também (D12):
