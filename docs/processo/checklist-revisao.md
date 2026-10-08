@@ -39,6 +39,8 @@
 
 - [ ] Os testes passam e a "Verificação" da tarefa foi cumprida? (CLAUDE.md, Fluxo de trabalho)
 - [ ] Cada cenário que a tarefa cita tem teste, inclusive os de concorrência? (constituição, Artigo VII)
+- [ ] Toda asserção pode falhar? Nenhum teste verifica só que algo não é nulo ou que o framework subiu, sem provar o
+  comportamento da tarefa. (constituição, Artigo VII)
 - [ ] O código está livre de tudo o que a lista do Artigo XII proíbe, inclusive nos testes? As anotações de
   `com.fasterxml.jackson.annotation` são permitidas; o resto de `com.fasterxml.jackson.*` não. (constituição, Artigo XII;
   ADR-0007)

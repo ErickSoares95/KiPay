@@ -37,6 +37,7 @@ Não leia a change inteira nem todas as ADRs sem necessidade.
   - conflito com a constituição, com uma ADR ou com o design;
   - trabalho além do que a tarefa descreve;
   - vontade de reduzir, adiar ou abrir exceção ao que foi especificado.
+- Escolha para "Para estudar" o que uma pessoa precisaria explicar numa entrevista sobre esta tarefa, não o óbvio.
 - Não marque o checkbox, não faça commit nem push e não comece a tarefa seguinte. Quem orquestra faz isso depois do
   revisor.
 - Se receber de volta falhas do revisor, corrija só o que foi apontado e rode a "Verificação" de novo.
@@ -52,6 +53,10 @@ Resposta curta, sem colar código nem logs:
 **Verificação**: <comando> → <resultado com números, por exemplo "BUILD SUCCESS, 5 testes no accounts e 5 no ledger">
 **Decisões tomadas dentro do escopo**: <lista curta ou "nenhuma">
 **Desvios ou perguntas em aberto**: <lista ou "nenhum">
+**Para estudar** (3 a 5 itens, sem colar código):
+- <peça: starter, anotação, propriedade, classe ou padrão> — o que faz por baixo; onde está (arquivo:linha);
+  se é o jeito atual, qual era o equivalente antigo.
+**Pergunta de entrevista**: uma pergunta típica de nível pleno sobre o ponto central da tarefa.
 ```
 
 Escreva em português (pt-BR).

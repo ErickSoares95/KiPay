@@ -71,6 +71,8 @@ operations:
         revisor roda de novo
       - Se a tarefa estiver marcada com "Plan mode recomendado", sugerir ao usuário planejá-la em plan mode antes de
         chamar o executor (prompt no CLAUDE.md, seção "Modo plan")
+      - Ao final da tarefa, mostrar a seção "Para estudar" do executor e lembrar da revisão de estudo no chat do
+        projeto antes da próxima tarefa
   archive:
     guidance:
       - Antes de arquivar, confirmar que todas as tarefas estão concluídas e que os testes passam

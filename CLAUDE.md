@@ -25,7 +25,10 @@ A constituição é carregada abaixo e deve ser seguida antes de qualquer tarefa
      Uma nova rodada do revisor só acontece quando houve falha; observações fora da checklist são tratadas sem nova
      rodada;
   4. marca o checkbox, localizando a linha pela busca do número da tarefa (não por número de linha guardado), e faz
-     o commit e o push.
+     o commit e o push;
+  5. termina mostrando ao usuário a seção "Para estudar" e a pergunta de entrevista do executor, e a linha
+     "Leve o commit <hash> para a revisão de estudo no chat do projeto antes da próxima tarefa." Nas tarefas
+     mecânicas, a revisão de estudo pode ser feita no fim do grupo do tasks.md.
 - Faça um commit por tarefa, seguindo a seção [Commits](#commits).
 - Ao final de cada tarefa, resuma o que mudou e liste os arquivos criados ou alterados.
 - Todo achado de revisão é registrado em `docs/processo/licoes-aprendidas.md` (arquivo local, fora do Git), com a
