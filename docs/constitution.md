@@ -4,7 +4,7 @@
 > Mudar um princípio exige nova versão desta constituição e uma ADR explicando o motivo.
 > Ao adotar o OpenSpec, este conteúdo passa a ser o contexto do projeto lido em toda mudança.
 
-**Versão**: 1.2.0 · **Ratificada em**: 2026-10 · **Última alteração**: 2026-10
+**Versão**: 1.3.0 · **Ratificada em**: 2026-10 · **Última alteração**: 2026-10
 
 ---
 
@@ -89,7 +89,7 @@ O código usa apenas as APIs atuais do stack definido abaixo. O jeito antigo apa
 | `@MockBean` / `@SpyBean` | `@MockitoBean` / `@MockitoSpyBean` |
 | `spring-boot-starter-web`, `-aop`, `-oauth2-*` | `spring-boot-starter-webmvc`, `-aspectj`, `-security-oauth2-*` |
 | Propriedades `spring.cloud.gateway.*` sem `server.webflux`/`server.webmvc` | `spring.cloud.gateway.server.webflux.*` ou `...server.webmvc.*` |
-| `com.fasterxml.jackson.*` (Jackson 2) | `tools.jackson.*` (Jackson 3) |
+| `com.fasterxml.jackson.*` (Jackson 2), exceto `com.fasterxml.jackson.annotation`, usado pelo Jackson 3 (ADR-0007) | `tools.jackson.*` (Jackson 3) |
 | `javax.*` | `jakarta.*` |
 | `JobBuilderFactory`, `StepBuilderFactory`, `CommandLineJobRunner` | `JobBuilder`, `StepBuilder`, `CommandLineJobOperator` |
 | `logstash-logback-encoder` + XML | `logging.structured.format.console` |

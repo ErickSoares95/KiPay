@@ -39,7 +39,9 @@
 
 - [ ] Os testes passam e a "Verificação" da tarefa foi cumprida? (CLAUDE.md, Fluxo de trabalho)
 - [ ] Cada cenário que a tarefa cita tem teste, inclusive os de concorrência? (constituição, Artigo VII)
-- [ ] O código está livre de tudo o que a lista do Artigo XII proíbe, inclusive nos testes? (constituição, Artigo XII)
+- [ ] O código está livre de tudo o que a lista do Artigo XII proíbe, inclusive nos testes? As anotações de
+  `com.fasterxml.jackson.annotation` são permitidas; o resto de `com.fasterxml.jackson.*` não. (constituição, Artigo XII;
+  ADR-0007)
 - [ ] Os nomes de classes, métodos, eventos, tópicos, tabelas e endpoints são os do glossário? (ADR-0004; CLAUDE.md,
   Idioma)
 - [ ] Se a tarefa altera o glossário, ele foi conferido contra o texto das specs e do design, e não só contra a lista
