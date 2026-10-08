@@ -91,7 +91,7 @@
   - depois de `docker compose down -v && docker compose up`, o realm é reimportado do arquivo com chaves novas;
   - o token de `ana` obtido com `kipay-cli` traz os claims `email` e `aud` contendo `accounts`;
   - o token de `sem-email` é emitido sem `invalid_grant` e não traz `email`.
-- [ ] 2.5 Criar `.github/workflows/ci.yml` (D13). Verificação: o workflow roda verde no GitHub depois do push.
+- [x] 2.5 Criar `.github/workflows/ci.yml` (D13). Verificação: o workflow roda verde no GitHub depois do push.
 
 ## 3. Segurança do Accounts (contas: "Abertura de conta por pessoa física autenticada"; Artigo IX)
 
