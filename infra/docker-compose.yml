@@ -1,4 +1,4 @@
-# Ambiente local (D13). Keycloak entra na tarefa 2.4.
+# Ambiente local (D13).
 # As portas de management (9081 e 9082) nao sao publicadas: so `expose`.
 name: kipay
 
@@ -53,6 +53,27 @@ services:
       timeout: 10s
       retries: 12
       start_period: 15s
+
+  keycloak:
+    image: ${KEYCLOAK_IMAGE:?defina KEYCLOAK_IMAGE no .env}
+    command: ["start-dev", "--import-realm"]
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN:?}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:?}
+      KC_HEALTH_ENABLED: "true"
+    volumes:
+      - ./keycloak:/opt/keycloak/data/import:ro
+    ports:
+      - "8080:8080"
+    expose:
+      - "9000"
+    healthcheck:
+      # A imagem nao tem curl nem wget: GET manual via /dev/tcp do bash, na porta de management.
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/localhost/9000 && printf 'GET /health/ready HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n' >&3 && grep -q '\"status\": \"UP\"' <&3"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+      start_period: 30s
 
   accounts:
     build:

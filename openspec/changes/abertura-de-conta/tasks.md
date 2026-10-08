@@ -78,7 +78,7 @@
   - o `/actuator/health/readiness` responde `UP` com o banco no ar, e o Kafka não faz parte do grupo `readiness`;
   - o grupo `liveness` contém só `livenessState`;
   - o valor efetivo de `management.tracing.sampling.probability` no contexto é `1.0`.
-- [ ] 2.4 Acrescentar o Keycloak ao Compose e criar o realm `kipay` (D9): clients `kipay-cli` e `accounts`, mapper de
+- [x] 2.4 Acrescentar o Keycloak ao Compose e criar o realm `kipay` (D9): clients `kipay-cli` e `accounts`, mapper de
   `email`, e-mail **não** obrigatório no perfil, usuários `ana`, `bruno` e `sem-email`. Em seguida:
   - exportar com `kc.sh export --realm kipay --users realm_file`, com o servidor parado ou num container separado;
   - remover os key providers do arquivo;
