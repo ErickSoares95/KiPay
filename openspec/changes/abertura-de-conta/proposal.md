@@ -96,6 +96,7 @@ Respondidas em 2026-10-07, durante a revisão da proposta:
 - **Infraestrutura**: `infra/docker-compose.yml` com dois PostgreSQL, Kafka (KRaft) e Keycloak com realm importado;
   pipeline de CI executando `mvn verify`.
 - **Documentação**: atualização do roadmap na visão geral (Keycloak antecipado) e do glossário com os termos novos
-  desta change. Duas ADRs novas: ADR-0005 (Keycloak como provedor de identidade, antecipado para esta change) e
+  desta change. Três ADRs novas: ADR-0005 (Keycloak como provedor de identidade, antecipado para esta change),
   ADR-0006 (compatibilidade do Spring Cloud com o Boot 4.1, ferramenta de testes de contrato e versão do springdoc
-  fixada fora dos BOMs).
+  fixada fora dos BOMs) e ADR-0008 (arquitetura interna: Accounts por funcionalidade, Ledger em Arquitetura
+  Hexagonal, com teste ArchUnit).

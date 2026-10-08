@@ -4,7 +4,8 @@
 
 O repositório ainda não tem código. `services/` e `infra/` estão vazios. Esta change cria os dois primeiros serviços,
 `accounts` e `ledger`, como projetos Maven independentes, e um `pom.xml` raiz que só agrega os módulos (ADR-0002). A
-mensageria é o Kafka (ADR-0003), e o código usa os nomes em inglês do glossário (ADR-0004). A motivação está em
+mensageria é o Kafka (ADR-0003), e o código usa os nomes em inglês do glossário (ADR-0004). A arquitetura
+interna de cada serviço está em D1 (ADR-0008). A motivação está em
 `proposal.md` (Why) e os requisitos em `specs/contas/spec.md` e `specs/contas-contabeis/spec.md`.
 
 Por decisão tomada no chat durante a criação desta change, o Keycloak entra já aqui. Assim o Accounts, único serviço
@@ -27,12 +28,12 @@ tarefas.
 | IV. Idempotência | `Idempotency-Key` obrigatório no `POST /accounts`. Consumidores com tabela `processed_events` e restrições de unicidade | Não |
 | V. Consistência declarada | Seção "Decisões de consistência" nas duas specs | Não |
 | VI. Outbox | Tabela `outbox_events` em cada serviço, gravada na mesma transação; o envelope traz `eventId`, `occurredAt`, `aggregateId` e `schemaVersion` | Não |
-| VII. Testes | Unitários com `@DisplayName`, integração com Testcontainers (PostgreSQL e Kafka) e testes de contrato dos eventos | Não. A ferramenta de contrato pede ADR (ADR-0006, ver D10) |
+| VII. Testes | Unitários com `@DisplayName`, integração com Testcontainers (PostgreSQL e Kafka) e testes de contrato dos eventos | Não. A ferramenta de contrato pede ADR (ADR-0006, ver D10). Um teste ArchUnit protege o domínio do Ledger (ADR-0008, D1) |
 | VIII. Observabilidade | Logs estruturados, `traceId` propagado por HTTP e Kafka (atravessando o Outbox), métricas RED, health checks | Não |
 | IX. Segurança | O Accounts valida o JWT do Keycloak (issuer e audiência). A conta é vinculada ao `sub` do token, e o CPF sai mascarado. O Ledger não recebe requisições com token nesta change: só consome eventos, e o Actuator fica numa porta de management fora da rede pública (D12). Só o `/v3/api-docs/**` do Accounts é público (D3) | **Parcial e aceito na ADR-0005**: a validação no Gateway chega na feature 3, e a do Ledger quando ele expuser API (change 002). A proteção do consumidor Kafka (ACL no broker) fica para uma fase futura |
 | X. Simplicidade | Só os dois serviços previstos. Tecnologia nova: Keycloak (já no stack, antecipado, ADR-0005) e a ferramenta de contrato (ADR-0006) | Não |
 | XI. Erros padronizados | `ProblemDetail` com a propriedade `code` | Não |
-| XII. APIs atuais | Starters `-webmvc` e `-security-oauth2-resource-server`, `SecurityFilterChain` com lambdas, Jackson 3 (`tools.jackson.*`), `jakarta.*`, `@MockitoBean`, `CompletableFuture`, `logging.structured.format.console` | **Exceção aceita na ADR-0006**: springdoc e Pact ficam fora dos BOMs, com versão fixada na ADR |
+| XII. APIs atuais | Starters `-webmvc` e `-security-oauth2-resource-server`, `SecurityFilterChain` com lambdas, Jackson 3 (`tools.jackson.*`), `jakarta.*`, `@MockitoBean`, `CompletableFuture`, `logging.structured.format.console` | **Exceção aceita na ADR-0006**: springdoc e Pact ficam fora dos BOMs, com versão fixada na ADR. **Exceção aceita na ADR-0008**: o ArchUnit (escopo de teste) fica fora dos BOMs, com versão fixada na ADR |
 
 ## Goals / Non-Goals
 
@@ -63,9 +64,45 @@ infra/keycloak/kipay-realm.json
 .github/workflows/ci.yml
 ```
 
-Cada serviço herda de `spring-boot-starter-parent` 4.1.x, com Java 25 e `spring.threads.virtual.enabled=true`. Os
-pacotes são organizados por funcionalidade: `account`, `outbox`, `idempotency`, `messaging`, `web` (erros e
-segurança) no Accounts; `ledgeraccount`, `outbox` e `messaging` no Ledger.
+Cada serviço herda de `spring-boot-starter-parent` 4.1.x, com Java 25 e `spring.threads.virtual.enabled=true`.
+
+**Arquitetura interna (ADR-0008).** A estrutura segue a importância do subdomínio:
+
+- **Accounts (subdomínio de suporte)**: pacotes por funcionalidade, com entidades ricas: `account`, `outbox`,
+  `idempotency`, `messaging`, `web` (erros e segurança).
+- **Ledger (domínio principal)**: Arquitetura Hexagonal. O Transfers seguirá o mesmo modelo quando for criado.
+
+```
+ledger/
+  domain/                    Java puro (sem Spring nem JPA): LedgerAccount, Currency, evento LedgerAccountCreated
+  application/port/in/       CreateLedgerAccountUseCase
+  application/port/out/      LedgerAccountRepository, ProcessedEvents, DomainEventPublisher, IdGenerator
+  application/service/       CreateLedgerAccountService (sem @Service; transação e idempotência)
+  adapter/in/messaging/      AccountOpenedListener, DefaultErrorHandler e DLT
+  adapter/out/persistence/   JdbcClient (ON CONFLICT), processed_events, UuidV7 (implementa IdGenerator)
+  adapter/out/outbox/        OutboxWriter (implementa DomainEventPublisher), OutboxRelay, envelope
+  config/                    registra os serviços de aplicação como @Bean
+```
+
+- **Dependências permitidas**, verificadas por um teste ArchUnit (tarefa 6.1), que falha se alguma for violada:
+  - `domain` só depende do JDK e do próprio `domain`. Em especial, não depende de Spring, de `jakarta.persistence` nem de
+    `jakarta.transaction`;
+  - `application` só depende do JDK, de `domain`, de `application` e de `org.springframework.transaction..`
+    (`@Transactional`, aceito na ADR-0008). Não depende de `adapter` nem de JPA;
+  - `adapter` pode depender das demais camadas.
+- O `CreateLedgerAccountService` não usa `@Service`, que é do Spring fora de `org.springframework.transaction..`. Ele é
+  registrado como `@Bean` em `config/`, e o `@Transactional` fica na classe.
+- O id da `LedgerAccount` vem da porta `IdGenerator`, implementada pelo `UuidV7` (D2) em `adapter/out/persistence`. O
+  domínio e a aplicação não conhecem a versão do UUID. Os testes unitários do serviço usam um `IdGenerator` falso, com
+  UUIDs conhecidos.
+- Entidades JPA do Ledger, quando houver leitura (change 002), serão classes de persistência separadas do domínio, em
+  `adapter/out/persistence`. Nesta change o insert é nativo (`JdbcClient`) e não há entidade JPA.
+- Alternativa descartada: **Arquitetura Hexagonal em todos os serviços**. O Accounts é subdomínio de suporte, com regras
+  simples (CPF, idade, vínculo). Portas e adaptadores só acrescentariam classes e mapeamentos, sem proteger um domínio
+  complexo (Artigo X).
+- Alternativa descartada: **camadas tradicionais (controller, service, repository) no Ledger**. Deixam o domínio
+  acoplado ao JPA e ao Spring, e nada impede essa dependência de crescer. No Ledger, o domínio é o núcleo do produto, e
+  as regras dos Artigos III e IV precisam de testes sem Spring.
 
 Starters nos dois serviços: `spring-boot-starter-webmvc` (para o Actuator), `-data-jpa`, `-flyway`, `-kafka`,
 `-actuator` e `-opentelemetry`, mais `micrometer-registry-prometheus`. Só no Accounts: `-validation`,
@@ -84,7 +121,8 @@ nos dois serviços, e `spring-security-test` só no Accounts.
   **UUID v7**, gerados na aplicação. O UUID v7 é ordenável no tempo, o que mantém o índice B-tree compacto, ao
   contrário do v4 aleatório. Um gerador único em cada serviço (a classe `UuidV7`, escrita sobre `java.util.UUID`, sem
   biblioteca fora dos BOMs) serve aos dois caminhos de gravação: as entidades JPA (via `@IdGeneratorType`) e os
-  inserts nativos com `JdbcClient` (`outbox_events` e, no Ledger, `ledger_accounts` com `ON CONFLICT`). A `Idempotency-Key` do cliente aceita qualquer versão de UUID.
+  inserts nativos com `JdbcClient` (`outbox_events` e, no Ledger, `ledger_accounts` com `ON CONFLICT`). No Ledger, o
+  `UuidV7` implementa a porta `IdGenerator` (D1). A `Idempotency-Key` do cliente aceita qualquer versão de UUID.
 - `account_holders`: `id` (UUID v7), `cpf` (CHAR(11), **UNIQUE**, constraint `uk_account_holders_cpf`),
   `owner_subject` (o `sub` do JWT, **UNIQUE**, constraint `uk_account_holders_owner_subject`), `full_name`
   (VARCHAR(200)), `birth_date` (DATE), `email` (VARCHAR(320), do claim `email` do token) e `created_at`. Esse par de
@@ -235,7 +273,8 @@ Tabela `outbox_events` em cada serviço: `id` (= `eventId`), `aggregate_id`, `ev
 evento está pendente).
 
 - `OutboxWriter` grava o evento na mesma transação do agregado (`@Transactional` obrigatório, propagation
-  `MANDATORY`).
+  `MANDATORY`). No Ledger, ele é o adaptador (`adapter/out/outbox`) da porta `DomainEventPublisher`: recebe o evento de
+  domínio e o converte no envelope, com tópico e chave (D5).
 - `OutboxRelay` roda com `@Scheduled(fixedDelay)`. Ele busca até 100 pendentes com
   `ORDER BY occurred_at FOR UPDATE SKIP LOCKED`, envia cada um com `KafkaTemplate.send(...)` e espera o
   `CompletableFuture` com timeout. Em seguida, grava `published_at`.
@@ -254,7 +293,8 @@ evento está pendente).
 Tabela `processed_events` (`event_id` PK, `processed_at`) em cada serviço. Numa única transação:
 `INSERT ... ON CONFLICT DO NOTHING`. Se nenhuma linha foi inserida, o evento é ignorado. Se foi, aplica o efeito.
 
-- **Ledger, `AccountOpenedListener`**: cria `LedgerAccount` com `INSERT ... ON CONFLICT (account_id) DO NOTHING` e,
+- **Ledger, `AccountOpenedListener`** (adaptador de entrada): traduz a mensagem e chama o `CreateLedgerAccountUseCase`.
+  O `CreateLedgerAccountService` faz, na transação, o que segue: cria `LedgerAccount` com `INSERT ... ON CONFLICT (account_id) DO NOTHING` e,
   só se uma linha foi inserida, grava no Outbox o `LedgerAccountCreated`. Um segundo evento diferente para a mesma
   conta não insere nada e é tratado como duplicado, sem gerar uma segunda confirmação. No PostgreSQL, deixar a
   restrição UNIQUE ser violada abortaria a transação inteira, inclusive o `processed_events`. O `ON CONFLICT` evita
@@ -269,7 +309,7 @@ Tabela `processed_events` (`event_id` PK, `processed_at`) em cada serviço. Numa
 
 ### D8. Modelo de dados do Ledger
 
-`ledger_accounts`: `id` (UUID v7, gerado na aplicação), `account_id` (UUID, **UNIQUE**), `currency` (CHAR(3), `BRL`) e
+`ledger_accounts`: `id` (UUID v7, obtido pela porta `IdGenerator`, D1), `account_id` (UUID, **UNIQUE**), `currency` (CHAR(3), `BRL`) e
 `created_at`. Não há coluna de saldo (Artigo III). As tabelas `ledger_entries` e `holds` nascem nas changes 002 e 004.
 O `id` de `outbox_events` do Ledger também é UUID v7. Os dois vêm do gerador `UuidV7` do Ledger (D2), porque o insert
 de `ledger_accounts` é nativo (`ON CONFLICT`) e não passa pelo gerador do Hibernate.
@@ -378,7 +418,8 @@ buildável sozinho com `mvn -f services/<nome>`). A pasta versionada de pacts at
 O envelope, o Outbox e o consumidor idempotente são escritos em cada serviço. O `ProblemDetail` só existe no Accounts
 nesta change, e o Ledger o ganha junto com a primeira API. A ADR-0002 deixou em aberto onde
 ficaria o código compartilhado. Esta change **não cria** uma biblioteca comum: com dois serviços, a duplicação é pequena
-e os testes de contrato protegem a compatibilidade. A decisão de criar uma biblioteca, se vier, gera uma nova ADR.
+e os testes de contrato protegem a compatibilidade. A duplicação vale também para a estrutura: o Outbox do Ledger é
+adaptador de porta (D1), e o do Accounts é um pacote por funcionalidade. A decisão de criar uma biblioteca, se vier, gera uma nova ADR.
 
 ### D12. Observabilidade
 
@@ -406,10 +447,11 @@ e os testes de contrato protegem a compatibilidade. A decisão de criar uma bibl
   não entra na readiness, senão o Kafka parado tiraria o serviço do balanceamento e recusaria pedidos que deveriam ser
   aceitos. A indisponibilidade do Kafka aparece no gauge `outbox.pending`, que cresce enquanto os eventos não saem.
 - **O Actuator fica numa porta de management separada** (`management.server.port`: 9081 no Accounts e 9082 no Ledger).
-  Essa porta não é publicada para fora da rede do Compose. O `SecurityFilterChain` do Accounts protege a porta da
-  aplicação. Na porta de management, os endpoints expostos (`health`, `prometheus`) são liberados com
-  `EndpointRequest.toAnyEndpoint()`, e o isolamento vem da rede, para que o Prometheus e as sondas de saúde não
-  precisem de token.
+  Essa porta não é publicada para fora da rede do Compose. O `SecurityFilterChain` do Accounts alcança as duas
+  portas. Na porta da aplicação, qualquer rota fora de `/v3/api-docs/**` exige token. Na porta de management, só
+  `health` e `prometheus` são liberados, com `EndpointRequest.to("health", "prometheus")`, e o isolamento vem da rede,
+  para que o Prometheus e as sondas de saúde não precisem de token. Os demais endpoints do Actuator continuam
+  autenticados.
   - Alternativa descartada: **liberar `/actuator/**` na porta da aplicação**. Expõe as métricas na mesma porta da API
     pública e mistura as regras de acesso das duas.
 

@@ -217,17 +217,36 @@
 
 ## 6. Conta contábil no Ledger (contas-contabeis)
 
-- [ ] 6.1 Implementar `LedgerAccount` (id UUID v7) e a migration de `ledger_accounts`, com `account_id` UNIQUE e sem
-  coluna de saldo (D8). Requisito: "Criação da conta contábil a partir da conta aberta". Verificação: um teste de
-  repositório com Testcontainers confirma a unicidade, um teste de schema confirma que não há coluna de saldo, e um
-  teste confirma que o id de `ledger_accounts`, gravado por insert nativo, é UUID versão 7, gerado pelo `UuidV7` do
-  Ledger (D2, D8).
-- [ ] 6.2 Implementar no Ledger o `OutboxWriter`, o `OutboxRelay` e o `NewTopic` de `ledger.ledger-account-created`,
-  e ligar `spring.kafka.template.observation-enabled` (D5, D6, D12). Requisitos: "Confirmação da criação da conta
+- [ ] 6.1 Criar a estrutura hexagonal do Ledger (D1, ADR-0008, que precisa estar "Aceita"):
+  - `domain`: `LedgerAccount` e `Currency`, em Java puro;
+  - `application/port/out`: `LedgerAccountRepository` e `IdGenerator`;
+  - `adapter/out/persistence`: o adaptador com `JdbcClient` (`INSERT ... ON CONFLICT (account_id) DO NOTHING`) e o
+    `UuidV7`, que implementa o `IdGenerator` (D2);
+  - a migration de `ledger_accounts`, com `account_id` UNIQUE e sem coluna de saldo (D8).
+
+  Acrescentar `archunit-junit5` (versão da ADR-0008, escopo de teste) e o teste `ArchitectureTests`. Requisito:
+  "Criação da conta contábil a partir da conta aberta". Verificação:
+  - um teste de repositório com Testcontainers confirma a unicidade, um teste de schema confirma que não há coluna de
+    saldo, e um teste confirma que o id de `ledger_accounts`, gravado por insert nativo, é UUID versão 7, gerado pelo
+    `UuidV7` (D2, D8);
+  - testes unitários de `LedgerAccount`, sem Spring;
+  - `ArchitectureTests` confirma que `..ledger.domain..` só depende do JDK e do próprio `domain` (nada de
+    `org.springframework..`, `jakarta.persistence..` ou `jakarta.transaction..`), e que `..ledger.application..` só
+    depende do JDK, de `domain`, de `application` e de `org.springframework.transaction..`, e não de `..adapter..`;
+  - a regra é provada: uma classe temporária em `domain` que importe Spring ou JPA, fora do commit, faz o teste
+    falhar, e outra em `application` que importe `org.springframework.stereotype.Service` também.
+
+  > **Plan mode recomendado** — foco: pacotes e portas do Ledger, regras do ArchUnit e a versão que lê o Java 25. Prompt sugerido: CLAUDE.md, seção "Modo plan".
+
+- [ ] 6.2 Implementar no Ledger a porta `DomainEventPublisher` (`application/port/out`) e, em `adapter/out/outbox`, o
+  `OutboxWriter` (que a implementa e converte o evento de domínio `LedgerAccountCreated` no envelope), o `OutboxRelay`
+  e o `NewTopic` de `ledger.ledger-account-created`, e ligar `spring.kafka.template.observation-enabled` (D1, D5, D6,
+  D12). Requisitos: "Confirmação da criação da conta
   contábil" e "Visibilidade de confirmações não publicadas". Verificação:
   - um teste de integração confirma que o `OutboxWriter` fora de uma transação falha, e que um rollback da transação
     do agregado não deixa linha no Outbox;
   - um teste confirma que o id de `outbox_events` do Ledger é UUID versão 7, gerado pelo `UuidV7` do Ledger;
+  - o `ArchitectureTests` (6.1) continua passando;
   - o schema `events/LedgerAccountCreated.v1.json` existe em `src/main/resources` (D5) e o payload gravado o respeita;
   - um teste com Testcontainers Kafka confirma que o `LedgerAccountCreated` chega ao tópico com a chave `accountId`, o
     envelope completo e, no header `traceparent`, o `traceId` da observação aberta pelo teste ao gravar o evento no
@@ -237,11 +256,19 @@
 
   > **Plan mode recomendado** — foco: reaproveitar o desenho de 5.1 e 5.2 no Ledger, sem biblioteca compartilhada. Prompt sugerido: CLAUDE.md, seção "Modo plan".
 
-- [ ] 6.3 Implementar o `AccountOpenedListener` com `processed_events`, `INSERT ... ON CONFLICT (account_id) DO NOTHING`
-  em `ledger_accounts`, o `DefaultErrorHandler` e a DLT `accounts.account-opened.dlt` (D7), e ligar
-  `spring.kafka.listener.observation-enabled` (D12). Requisitos: "Criação da
-  conta contábil a partir da conta aberta", "Uma única conta contábil por conta", "Confirmação da criação da conta
-  contábil" e "Eventos inválidos não bloqueiam o processamento". Verificação: testes com Testcontainers Kafka para:
+- [ ] 6.3 Implementar o caso de uso `CreateLedgerAccountUseCase` (`application/port/in`) e o
+  `CreateLedgerAccountService` (`application/service`, `@Transactional`, sem `@Service`, registrado como `@Bean` em
+  `config/`), que usa as portas `ProcessedEvents` (`processed_events`), `LedgerAccountRepository` (`ON CONFLICT
+  (account_id) DO NOTHING`), `IdGenerator` e `DomainEventPublisher`. Implementar o `AccountOpenedListener`
+  (`adapter/in/messaging`), que só traduz a mensagem e chama o caso de uso, com o `DefaultErrorHandler` e a DLT
+  `accounts.account-opened.dlt` (D1, D7), e ligar `spring.kafka.listener.observation-enabled` (D12). Requisitos:
+  "Criação da conta contábil a partir da conta aberta", "Uma única conta contábil por conta", "Confirmação da criação
+  da conta contábil" e "Eventos inválidos não bloqueiam o processamento". Verificação:
+  - testes unitários do `CreateLedgerAccountService`, sem Spring, com portas falsas e um `IdGenerator` falso de UUIDs
+    conhecidos. Eles verificam explicitamente o id gravado e o id publicado no `LedgerAccountCreated` (evento novo,
+    evento duplicado e conta já existente);
+  - o `ArchitectureTests` (6.1) continua passando;
+  - testes com Testcontainers Kafka para:
   - evento recebido (uma `LedgerAccount` e um `LedgerAccountCreated` no Outbox);
   - evento duplicado;
   - dois eventos diferentes para a mesma conta (uma `LedgerAccount`, uma confirmação e o segundo evento registrado em
@@ -285,7 +312,8 @@
 - [ ] 8.1 Criar os pacts de `AccountOpened` (consumidor Ledger, produtor Accounts) e de `LedgerAccountCreated`
   (consumidor Accounts, produtor Ledger). Os testes de consumidor gravam os pacts em `contracts/pacts/`, versionado no
   repositório. Os testes de produtor dos dois serviços verificam esses pacts publicando de fato no Kafka
-  (Testcontainers), sem dependência Maven entre os serviços (D10). O `ci.yml` ganha o passo
+  (Testcontainers), sem dependência Maven entre os serviços (D10). No Ledger, o teste de consumidor entrega a mensagem
+  ao handler do `AccountOpenedListener`, e o de produtor aciona o `DomainEventPublisher` e o `OutboxRelay` (D1). O `ci.yml` ganha o passo
   `git diff --exit-code contracts/pacts`. Requisitos: "Evento de conta aberta", "Criação da conta contábil a partir da
   conta aberta", "Confirmação da criação da conta contábil" e "Ativação após a confirmação do livro-razão".
   Verificação:
