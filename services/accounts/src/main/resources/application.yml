@@ -8,6 +8,18 @@ spring:
     open-in-view: false
     hibernate:
       ddl-auto: validate
+  mvc:
+    problemdetails:
+      enabled: true
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${KIPAY_ISSUER_URI:http://localhost:8080/realms/kipay}
+
+kipay:
+  security:
+    audience: accounts
 
 server:
   port: 8081

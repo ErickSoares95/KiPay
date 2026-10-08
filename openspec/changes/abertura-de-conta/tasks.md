@@ -95,7 +95,7 @@
 
 ## 3. Segurança do Accounts (contas: "Abertura de conta por pessoa física autenticada"; Artigo IX)
 
-- [ ] 3.1 No Accounts, criar o `@RestControllerAdvice` base com `ProblemDetail` e a propriedade `code`, incluindo
+- [x] 3.1 No Accounts, criar o `@RestControllerAdvice` base com `ProblemDetail` e a propriedade `code`, incluindo
   `VALIDATION_ERROR` com a lista de campos e o banco indisponível como `503 SERVICE_UNAVAILABLE` (D3). Criar também o
   `SecurityFilterChain` de resource server com validação de issuer e audiência, e um `AuthenticationEntryPoint` que
   responde `401` no mesmo formato, com o `code` `AUTHENTICATION_REQUIRED` (D3, D9). Liberar o `/v3/api-docs/**` sem

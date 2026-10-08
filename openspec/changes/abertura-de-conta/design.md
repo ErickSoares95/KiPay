@@ -305,8 +305,8 @@ traz o `SecurityFilterChain` e a validação do token, como prevê a ADR-0005.
   Toda mudança no realm passa por um novo export, nunca por edição manual do JSON. As senhas dos usuários de teste são
   só para o ambiente local e ficam documentadas em `infra/README.md`, junto com o passo a passo do export.
 - No Accounts, um bean `SecurityFilterChain` usa `authorizeHttpRequests` e a DSL com lambdas, com
-  `oauth2ResourceServer(jwt)`, `issuer-uri` do realm e validação da audiência `accounts`. Só o `/v3/api-docs/**` é liberado sem
-  token (D3).
+  `oauth2ResourceServer(jwt)`, `issuer-uri` do realm e validação da audiência `accounts`. Só o `/v3/api-docs/**` e os endpoints
+  `health` e `prometheus` do actuator (que a chain também alcança na porta de management) são liberados sem token (D3).
 - A sessão é stateless, e o CSRF fica desligado só porque não há cookies.
 - Autorização por recurso: o `AccountQueryService` busca por (`accountId`, `owner_subject` = `sub`).
 - Os testes de negócio da API usam `SecurityMockMvcRequestPostProcessors.jwt()`, sem `@MockitoBean` do `JwtDecoder`.

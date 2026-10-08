@@ -57,7 +57,8 @@ class ObservabilityTests {
         HttpResponse<String> onManagementPort = get(managementPort, "/actuator/prometheus");
 
         assertThat(serverPort).isNotEqualTo(managementPort);
-        assertThat(onServerPort.statusCode()).isEqualTo(404);
+        // With the resource server the application port answers 401 to any route that is not public (was 404 before 3.1).
+        assertThat(onServerPort.statusCode()).isEqualTo(401);
         assertThat(onManagementPort.statusCode()).isEqualTo(200);
         assertThat(onManagementPort.body()).contains("http_server_requests");
     }

@@ -84,6 +84,7 @@ services:
       SPRING_DATASOURCE_USERNAME: ${ACCOUNTS_DB_USER:?}
       SPRING_DATASOURCE_PASSWORD: ${ACCOUNTS_DB_PASSWORD:?}
       SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      KIPAY_ISSUER_URI: ${KIPAY_ISSUER_URI:-http://localhost:8080/realms/kipay}
     ports:
       - "8081:8081"
     expose:
