@@ -12,7 +12,7 @@
   `openspec validate abertura-de-conta --strict` passa e nenhum requisito diz mais "depende da pergunta em aberto".
 - [x] 1.2 Acrescentar os termos de D14 ao `docs/dominio/glossario.md`. Verificação: todo termo de negócio novo das
   specs e do design está no glossário. Nomes técnicos de implementação, como `JdbcClient` e `OutboxRelay`, não entram.
-- [ ] 1.3 Escrever a ADR-0005, "Keycloak como provedor de identidade", seguindo `docs/adr/0000-template.md`, e
+- [x] 1.3 Escrever a ADR-0005, "Keycloak como provedor de identidade", seguindo `docs/adr/0000-template.md`, e
   atualizar no mesmo commit a seção 6 de `docs/arquitetura/visao-geral.md` (o Keycloak entra na feature 1, e o
   Gateway, o Registry e o Config Server continuam na 3). A ADR registra:
   - o porquê da escolha: OIDC e JWT padrão, self-hosted no Docker Compose, sem custo nem conta em nuvem, realm

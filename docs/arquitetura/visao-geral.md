@@ -102,9 +102,9 @@ flowchart LR
 | Ordem | Feature | O que nasce na arquitetura | Conceitos revisados |
 |---|---|---|---|
 | 0 | Fundação do repositório | Repositório, documentação, OpenSpec | SDD, ADR |
-| 1 | Abertura de conta | Accounts e Ledger, PostgreSQL por serviço, Kafka, Outbox, Docker Compose, CI | Database per Service, coreografia, consistência eventual, consumidor idempotente, unicidade |
+| 1 | Abertura de conta | Accounts e Ledger, PostgreSQL por serviço, Kafka, Outbox, Keycloak (antecipado, ADR-0005), Docker Compose, CI | Database per Service, coreografia, consistência eventual, consumidor idempotente, unicidade, JWT no resource server |
 | 2 | Depósito simulado (cash-in) | Núcleo do Ledger: lançamentos e saldo | Partidas dobradas, idempotência, ACID, saldo nunca negativo |
-| 3 | Borda e identidade | Keycloak, API Gateway, Service Registry, Config Server | Access Token Pattern, JWT/JWKS, dupla validação, Service Discovery |
+| 3 | Borda e identidade | API Gateway, Service Registry, Config Server | Access Token Pattern, JWT/JWKS, dupla validação, Service Discovery |
 | 4 | Transferência interna | Transfers | Saga orquestrada, reserva, compensação, Resilience4j |
 | 5 | Extrato | Statement | CQRS, eventos, Outbox |
 | 6 | Notificações | Notifications | Consumidores idempotentes, retry e DLT |
@@ -115,6 +115,10 @@ flowchart LR
 | 11 | Plataforma e deploy | Kubernetes, gestão de segredos, AWS | Deploy, Vault/Secrets Manager |
 | 12 | Assistente | Assistant | Spring AI, RAG |
 
-> A borda (Keycloak e Gateway) entra antes da transferência: a regra "o titular só acessa as próprias contas"
-> (constituição, Artigo IX) se torna crítica quando o dinheiro passa a se mover entre pessoas, e incluí-la com
-> apenas dois serviços prontos custa pouco.
+> O Keycloak entra já na feature 1 (ADR-0005): a conta nasce vinculada à identidade de quem a abriu, e o Accounts
+> valida o token desde a primeira API. O Ledger passa a validar o token quando expuser API (feature 2, change 002).
+>
+> A borda (Gateway) entra antes da transferência: a regra "o titular só acessa as próprias contas"
+> (constituição, Artigo IX) se torna crítica quando o dinheiro passa a se mover entre pessoas, e incluir a validação
+> no Gateway com apenas dois serviços prontos custa pouco. Até lá, a validação no Gateway fica pendente, como aceita
+> na ADR-0005.
