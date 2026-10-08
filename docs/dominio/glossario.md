@@ -29,6 +29,62 @@
 | Conciliação | `Reconciliation` |
 | Chave de idempotência | `IdempotencyKey` (header HTTP `Idempotency-Key`) |
 | Dinheiro / valor monetário | `Money` |
+| Abertura de conta | `AccountOpening` |
+| Pedido de abertura (corpo do `POST /accounts`) | `AccountOpeningRequest` |
+| Ativação (da conta) | `activation` (método `Account.activate`) |
+| Encerramento (da conta) | `closing` (método `Account.close`) |
+| Conta pendente além do limite | stale pending account |
+| Conta desconhecida | `UnknownAccount` (`UnknownAccountException`) |
+| Política do titular (regras de aceitação, como a idade mínima) | `AccountHolderPolicy` |
+| CPF mascarado | `masked` (`Cpf.masked()`) |
+| Dígitos verificadores (do CPF) | check digits |
+| Evento processado | `ProcessedEvent` |
+| Evento do Outbox | `OutboxEvent` |
+| Registro de idempotência | `IdempotencyRecord` |
+| Reabertura (nova conta depois do encerramento) | `reopening` |
+| Separar para análise (mensagem que não pode ser processada) | dead letter topic (DLT), sufixo `.dlt` no tópico |
+
+## Atributos
+
+| Português (docs) | Inglês (código) |
+|---|---|
+| Pode movimentar | `canMoveMoney` |
+| Identificador da conta | `accountId` |
+| Identificador da conta contábil | `ledgerAccountId` |
+| Identidade do titular | `ownerSubject` |
+| Nome completo | `fullName` |
+| Data de nascimento | `birthDate` |
+| E-mail | `email` |
+| Momento da abertura | `openedAt` |
+| Momento da ativação | `activatedAt` |
+| Moeda | `currency` |
+| Idade mínima | `minimumAge` |
+
+## Métricas
+
+| Português (docs) | Inglês (código) |
+|---|---|
+| Contas pendentes além do limite | `accounts.pending.stale` |
+| Pedidos de abertura de conta | `accounts.opening.requests` (tag `outcome`) |
+
+## Códigos de erro
+
+Valores da propriedade `code` do `ProblemDetail` (constituição, Artigo XI).
+
+| Português (docs) | Inglês (código) |
+|---|---|
+| Dados inválidos | `VALIDATION_ERROR` |
+| CPF inválido | `ACCOUNT_INVALID_CPF` |
+| Titular menor de idade | `ACCOUNT_HOLDER_UNDERAGE` |
+| Identidade sem e-mail | `IDENTITY_EMAIL_MISSING` |
+| Conta já aberta | `ACCOUNT_ALREADY_OPEN` |
+| CPF já cadastrado | `ACCOUNT_CPF_ALREADY_REGISTERED` |
+| Identidade já vinculada a outro CPF | `ACCOUNT_IDENTITY_ALREADY_LINKED` |
+| Conta não encontrada | `ACCOUNT_NOT_FOUND` |
+| Chave de idempotência ausente | `IDEMPOTENCY_KEY_MISSING` |
+| Chave de idempotência inválida | `IDEMPOTENCY_KEY_INVALID` |
+| Chave de idempotência reutilizada | `IDEMPOTENCY_KEY_REUSED` |
+| Pedido em processamento | `IDEMPOTENCY_REQUEST_IN_PROGRESS` |
 
 ## Serviços
 

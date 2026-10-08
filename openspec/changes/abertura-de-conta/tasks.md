@@ -10,7 +10,7 @@
   (requisitos "Dados cadastrais obrigatórios", "Idade mínima", "Validação do CPF", "CPF único", "Vínculo entre
   identidade e CPF", "Ativação após a confirmação do livro-razão" e "Visibilidade de contas pendentes"). Verificação:
   `openspec validate abertura-de-conta --strict` passa e nenhum requisito diz mais "depende da pergunta em aberto".
-- [ ] 1.2 Acrescentar os termos de D14 ao `docs/dominio/glossario.md`. Verificação: todo termo de negócio novo das
+- [x] 1.2 Acrescentar os termos de D14 ao `docs/dominio/glossario.md`. Verificação: todo termo de negócio novo das
   specs e do design está no glossário. Nomes técnicos de implementação, como `JdbcClient` e `OutboxRelay`, não entram.
 - [ ] 1.3 Escrever a ADR-0005, "Keycloak como provedor de identidade", seguindo `docs/adr/0000-template.md`, e
   atualizar no mesmo commit a seção 6 de `docs/arquitetura/visao-geral.md` (o Keycloak entra na feature 1, e o
