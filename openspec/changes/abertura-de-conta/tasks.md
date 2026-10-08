@@ -50,7 +50,7 @@
 
 ## 2. Fundação dos serviços e da infraestrutura
 
-- [ ] 2.1 Criar o `pom.xml` raiz agregador, o `services/accounts` e o `services/ledger` (D1), com Flyway, `JsonMapper`
+- [x] 2.1 Criar o `pom.xml` raiz agregador, o `services/accounts` e o `services/ledger` (D1), com Flyway, `JsonMapper`
   do Jackson 3 e virtual threads. Verificação: em cada serviço, um teste `@SpringBootTest` com PostgreSQL e Kafka via
   Testcontainers (`@ServiceConnection`) sobe o contexto, e o health da porta de management responde `UP`. O
   `mvn verify` na raiz builda e testa os dois.
