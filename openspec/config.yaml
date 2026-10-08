@@ -59,14 +59,17 @@ rules:
     - Testes são escritos junto com a tarefa, nunca deixados para o final
     - Usar os mesmos nomes de classes, endpoints, eventos e tabelas definidos no design
 
-# Per-operation guidance (optional)
-# Add advisory guidance for how apply and archive work should be conducted.
-# This is separate from artifact rules above.
-# Example:
-#   operations:
-#     apply:
-#       guidance:
-#         - Keep test summaries concise
-#     archive:
-#       guidance:
-#         - Summarize the archive outcome before finishing
+# Orientação por operação (apply e archive), separada das regras de artefatos acima.
+operations:
+  apply:
+    guidance:
+      - Implementar apenas a próxima tarefa pendente do tasks.md e parar ao final dela
+      - Antes do commit, rodar o subagente revisor com a seção "Tarefa" de docs/processo/checklist-revisao.md,
+        passando os arquivos alterados, e corrigir o que falhar
+  archive:
+    guidance:
+      - Antes de arquivar, confirmar que todas as tarefas estão concluídas e que os testes passam
+      - Confirmar que openspec validate --strict passa sem erros
+      - Confirmar que as ADRs criadas pela change estão com o status "Aceita"
+      - Confirmar que o glossário (docs/dominio/glossario.md) e a visão geral (docs/arquitetura/visao-geral.md) estão
+        atualizados
