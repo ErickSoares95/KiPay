@@ -2,6 +2,9 @@ package io.github.ericksoares95.kipay.accounts.error;
 
 import java.util.Map;
 
+import io.github.ericksoares95.kipay.accounts.account.AccountOpeningRequest;
+import io.github.ericksoares95.kipay.accounts.account.UnderageHolderException;
+
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
@@ -33,9 +36,19 @@ public class ErrorProbeController {
         return Map.of("status", "ok");
     }
 
+    @PostMapping("/account-opening")
+    Map<String, String> accountOpening(@Valid @RequestBody AccountOpeningRequest request) {
+        return Map.of("status", "ok");
+    }
+
     @GetMapping("/db-failure")
     Map<String, String> dbFailure() {
         throw new DataAccessResourceFailureException(DRIVER_MESSAGE);
+    }
+
+    @GetMapping("/underage")
+    Map<String, String> underage() {
+        throw new UnderageHolderException();
     }
 
     @GetMapping("/protected")

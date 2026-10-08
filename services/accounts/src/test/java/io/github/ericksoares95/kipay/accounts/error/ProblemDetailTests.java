@@ -57,6 +57,20 @@ class ProblemDetailTests {
     }
 
     @Test
+    @DisplayName("um titular menor de idade vira 422 em ProblemDetail com o code ACCOUNT_HOLDER_UNDERAGE e sem dados pessoais")
+    void underageHolderIsUnprocessableEntity() throws Exception {
+        MockHttpServletResponse response = mockMvc.perform(get("/test-probe/underage").with(jwt()))
+                .andReturn().getResponse();
+
+        assertThat(response.getStatus()).isEqualTo(422);
+        assertThat(response.getContentType()).startsWith("application/problem+json");
+        JsonNode body = jsonMapper.readTree(response.getContentAsString());
+        assertThat(body.get("status").asInt()).isEqualTo(422);
+        assertThat(body.get("code").asString()).isEqualTo("ACCOUNT_HOLDER_UNDERAGE");
+        assertThat(body.has("errors")).isFalse();
+    }
+
+    @Test
     @DisplayName("uma falha de acesso ao banco vira 503 em ProblemDetail com o code SERVICE_UNAVAILABLE e sem a mensagem do driver")
     void databaseFailureIsServiceUnavailable() throws Exception {
         MockHttpServletResponse response = mockMvc.perform(get("/test-probe/db-failure").with(jwt()))

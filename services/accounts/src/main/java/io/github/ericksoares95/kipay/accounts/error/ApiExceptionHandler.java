@@ -4,6 +4,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
+import io.github.ericksoares95.kipay.accounts.account.UnderageHolderException;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.MessageSourceResolvable;
@@ -14,6 +16,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.transaction.CannotCreateTransactionException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -23,12 +26,17 @@ import org.springframework.web.context.request.WebRequest;
 import org.springframework.web.method.annotation.HandlerMethodValidationException;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 
+import tools.jackson.core.JacksonException;
+
 @RestControllerAdvice
 public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
 
     private static final Logger log = LoggerFactory.getLogger(ApiExceptionHandler.class);
 
     static final String VALIDATION_DETAIL = "Um ou mais campos são inválidos.";
+    static final String UNDERAGE_DETAIL = "O titular não atinge a idade mínima para abrir uma conta.";
+    static final String UNREADABLE_FIELD_MESSAGE = "valor inválido ou em formato inesperado";
+    static final String UNREADABLE_BODY_MESSAGE = "corpo da requisição ilegível";
     static final String UNAVAILABLE_DETAIL = "Serviço temporariamente indisponível. Tente novamente em instantes.";
 
     @Override
@@ -55,6 +63,23 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
         return handleExceptionInternal(ex, validationProblem(errors), headers, HttpStatus.BAD_REQUEST, request);
     }
 
+    /**
+     * A body that cannot be deserialized (for example a malformed {@code birthDate}) is a validation error too.
+     * Only the property name taken from the Jackson path is reported; the offending value is never echoed (LGPD).
+     */
+    @Override
+    protected ResponseEntity<Object> handleHttpMessageNotReadable(HttpMessageNotReadableException ex,
+            HttpHeaders headers, HttpStatusCode status, WebRequest request) {
+        List<Map<String, String>> errors = new ArrayList<>();
+        if (ex.getCause() instanceof JacksonException jackson && !jackson.getPath().isEmpty()) {
+            String property = jackson.getPath().getLast().getPropertyName();
+            errors.add(fieldEntry(property, UNREADABLE_FIELD_MESSAGE));
+        } else {
+            errors.add(fieldEntry("body", UNREADABLE_BODY_MESSAGE));
+        }
+        return handleExceptionInternal(ex, validationProblem(errors), headers, HttpStatus.BAD_REQUEST, request);
+    }
+
     @ExceptionHandler({ DataAccessResourceFailureException.class, QueryTimeoutException.class,
             CannotCreateTransactionException.class })
     ResponseEntity<Object> handleDatabaseUnavailable(Exception ex, WebRequest request) {
@@ -63,6 +88,14 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
         ProblemDetail problem = ProblemDetails.of(HttpStatus.SERVICE_UNAVAILABLE, ErrorCode.SERVICE_UNAVAILABLE,
                 UNAVAILABLE_DETAIL);
         return handleExceptionInternal(ex, problem, new HttpHeaders(), HttpStatus.SERVICE_UNAVAILABLE, request);
+    }
+
+    @ExceptionHandler(UnderageHolderException.class)
+    ResponseEntity<Object> handleUnderageHolder(UnderageHolderException ex, WebRequest request) {
+        // No name, CPF or birth date in the body: the client already knows what it sent.
+        ProblemDetail problem = ProblemDetails.of(HttpStatus.UNPROCESSABLE_CONTENT, ErrorCode.ACCOUNT_HOLDER_UNDERAGE,
+                UNDERAGE_DETAIL);
+        return handleExceptionInternal(ex, problem, new HttpHeaders(), HttpStatus.UNPROCESSABLE_CONTENT, request);
     }
 
     private static ProblemDetail validationProblem(List<Map<String, String>> errors) {

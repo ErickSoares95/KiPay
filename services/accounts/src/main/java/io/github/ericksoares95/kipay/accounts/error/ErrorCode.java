@@ -6,5 +6,6 @@ package io.github.ericksoares95.kipay.accounts.error;
 public enum ErrorCode {
     VALIDATION_ERROR,
     SERVICE_UNAVAILABLE,
-    AUTHENTICATION_REQUIRED
+    AUTHENTICATION_REQUIRED,
+    ACCOUNT_HOLDER_UNDERAGE
 }

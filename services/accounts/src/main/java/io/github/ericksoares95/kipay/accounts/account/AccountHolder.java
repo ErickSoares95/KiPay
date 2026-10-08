@@ -48,7 +48,8 @@ public class AccountHolder {
             Instant createdAt) {
         this.cpf = cpf;
         this.ownerSubject = ownerSubject;
-        this.fullName = fullName;
+        // Single normalization point: the name is kept as informed, without leading/trailing spaces.
+        this.fullName = fullName == null ? null : fullName.strip();
         this.birthDate = birthDate;
         this.email = email;
         this.createdAt = createdAt;

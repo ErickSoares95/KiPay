@@ -126,7 +126,7 @@
     UUID versão 7;
   - testes de repositório com Testcontainers confirmam as três constraints, inclusive que uma segunda conta é aceita
     quando a primeira está `CLOSED`.
-- [ ] 4.3 Implementar o `AccountHolderPolicy` (idade mínima de 18 anos com `Clock` e fuso `America/Sao_Paulo`) e as
+- [x] 4.3 Implementar o `AccountHolderPolicy` (idade mínima de 18 anos com `Clock` e fuso `America/Sao_Paulo`) e as
   validações do pedido: `fullName` obrigatório e não em branco, `birthDate` obrigatória, válida e não futura (D2).
   Requisitos: "Dados cadastrais obrigatórios" e "Idade mínima". Verificação:
   - testes unitários com `Clock` fixo para a véspera do 18º aniversário (recusada), o dia do aniversário (aceito) e
