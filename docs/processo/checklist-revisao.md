@@ -42,6 +42,9 @@
 - [ ] O código está livre de tudo o que a lista do Artigo XII proíbe, inclusive nos testes? (constituição, Artigo XII)
 - [ ] Os nomes de classes, métodos, eventos, tópicos, tabelas e endpoints são os do glossário? (ADR-0004; CLAUDE.md,
   Idioma)
+- [ ] Se a tarefa altera o glossário, ele foi conferido contra o texto das specs e do design, e não só contra a lista
+  de termos novos do design, incluindo os identificadores de agregado expostos em API ou evento? (ADR-0004; CLAUDE.md,
+  Idioma)
 - [ ] A injeção de dependência é sempre por construtor, sem `@Autowired` em campo ou setter? (CLAUDE.md, Código e
   testes)
 - [ ] Todo teste tem `@DisplayName` descritivo em português? (CLAUDE.md, Código e testes; constituição, Artigo VII)
