@@ -18,6 +18,10 @@ A constituição é carregada abaixo e deve ser seguida antes de qualquer tarefa
 - Implemente **uma tarefa por vez**. Só considere a tarefa concluída com os testes passando.
 - Faça um commit por tarefa, seguindo a seção [Commits](#commits).
 - Ao final de cada tarefa, resuma o que mudou e liste os arquivos criados ou alterados.
+- Ao final de cada tarefa, antes do commit, rode o subagente `revisor` com a seção "Tarefa" de
+  `docs/processo/checklist-revisao.md`, passando os arquivos alterados, e corrija o que falhar.
+- Todo achado de revisão é registrado em `docs/processo/licoes-aprendidas.md`, com a regra criada e onde ela foi
+  aplicada.
 
 ## Código e testes
 
