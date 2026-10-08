@@ -80,7 +80,8 @@
   - o valor efetivo de `management.tracing.sampling.probability` no contexto é `1.0`.
 - [x] 2.4 Acrescentar o Keycloak ao Compose e criar o realm `kipay` (D9): clients `kipay-cli` e `accounts`, mapper de
   `email`, e-mail **não** obrigatório no perfil, usuários `ana`, `bruno` e `sem-email`. Em seguida:
-  - exportar com `kc.sh export --realm kipay --users realm_file`, com o servidor parado ou num container separado;
+  - exportar com `kc.sh export --realm kipay --users realm_file --dir <pasta>`, com o servidor parado ou num container
+    separado (no Keycloak 26.4.7, `--users realm_file` só vale com `--dir`; com `--file` o Keycloak exige `same_file`);
   - remover os key providers do arquivo;
   - versionar o arquivo em `infra/keycloak/kipay-realm.json`;
   - documentar em `infra/README.md` o passo a passo do export e as credenciais locais.
