@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <!-- Só agrega os serviços (ADR-0002). Nenhum serviço herda deste POM. -->
+  <groupId>io.github.ericksoares95.kipay</groupId>
+  <artifactId>kipay</artifactId>
+  <version>0.0.1-SNAPSHOT</version>
+  <packaging>pom</packaging>
+
+  <modules>
+    <module>services/accounts</module>
+    <module>services/ledger</module>
+  </modules>
+</project>
