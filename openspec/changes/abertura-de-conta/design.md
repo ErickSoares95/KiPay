@@ -29,10 +29,10 @@ tarefas.
 | VI. Outbox | Tabela `outbox_events` em cada serviço, gravada na mesma transação; o envelope traz `eventId`, `occurredAt`, `aggregateId` e `schemaVersion` | Não |
 | VII. Testes | Unitários com `@DisplayName`, integração com Testcontainers (PostgreSQL e Kafka) e testes de contrato dos eventos | Não. A ferramenta de contrato pede ADR (ADR-0006, ver D10) |
 | VIII. Observabilidade | Logs estruturados, `traceId` propagado por HTTP e Kafka (atravessando o Outbox), métricas RED, health checks | Não |
-| IX. Segurança | O Accounts valida o JWT do Keycloak (issuer e audiência). A conta é vinculada ao `sub` do token, e o CPF sai mascarado. O Ledger não recebe requisições com token nesta change: só consome eventos, e o Actuator fica numa porta de management fora da rede pública (D12) | **Parcial e aceito na ADR-0005**: a validação no Gateway chega na feature 3, e a do Ledger quando ele expuser API (change 002). A proteção do consumidor Kafka (ACL no broker) fica para uma fase futura |
+| IX. Segurança | O Accounts valida o JWT do Keycloak (issuer e audiência). A conta é vinculada ao `sub` do token, e o CPF sai mascarado. O Ledger não recebe requisições com token nesta change: só consome eventos, e o Actuator fica numa porta de management fora da rede pública (D12). Só o `/v3/api-docs/**` do Accounts é público (D3) | **Parcial e aceito na ADR-0005**: a validação no Gateway chega na feature 3, e a do Ledger quando ele expuser API (change 002). A proteção do consumidor Kafka (ACL no broker) fica para uma fase futura |
 | X. Simplicidade | Só os dois serviços previstos. Tecnologia nova: Keycloak (já no stack, antecipado, ADR-0005) e a ferramenta de contrato (ADR-0006) | Não |
 | XI. Erros padronizados | `ProblemDetail` com a propriedade `code` | Não |
-| XII. APIs atuais | Starters `-webmvc` e `-security-oauth2-resource-server`, `SecurityFilterChain` com lambdas, Jackson 3 (`tools.jackson.*`), `jakarta.*`, `@MockitoBean`, `CompletableFuture`, `logging.structured.format.console` | Não |
+| XII. APIs atuais | Starters `-webmvc` e `-security-oauth2-resource-server`, `SecurityFilterChain` com lambdas, Jackson 3 (`tools.jackson.*`), `jakarta.*`, `@MockitoBean`, `CompletableFuture`, `logging.structured.format.console` | **Exceção aceita na ADR-0006**: springdoc e Pact ficam fora dos BOMs, com versão fixada na ADR |
 
 ## Goals / Non-Goals
 
@@ -82,8 +82,9 @@ nos dois serviços, e `spring-security-test` só no Accounts.
 
 - Identificadores: todas as chaves primárias geradas pelo sistema (`account_holders`, `accounts`, `outbox_events`) são
   **UUID v7**, gerados na aplicação. O UUID v7 é ordenável no tempo, o que mantém o índice B-tree compacto, ao
-  contrário do v4 aleatório. A geração usa o Hibernate 7 do BOM do Boot (`@UuidGenerator(style = VERSION_7)`), sem
-  biblioteca fora dos BOMs. A `Idempotency-Key` do cliente aceita qualquer versão de UUID.
+  contrário do v4 aleatório. Um gerador único em cada serviço (a classe `UuidV7`, escrita sobre `java.util.UUID`, sem
+  biblioteca fora dos BOMs) serve aos dois caminhos de gravação: as entidades JPA (via `@IdGeneratorType`) e os
+  inserts nativos com `JdbcClient` (`outbox_events` e, no Ledger, `ledger_accounts` com `ON CONFLICT`). A `Idempotency-Key` do cliente aceita qualquer versão de UUID.
 - `account_holders`: `id` (UUID v7), `cpf` (CHAR(11), **UNIQUE**, constraint `uk_account_holders_cpf`),
   `owner_subject` (o `sub` do JWT, **UNIQUE**, constraint `uk_account_holders_owner_subject`), `full_name`
   (VARCHAR(200)), `birth_date` (DATE), `email` (VARCHAR(320), do claim `email` do token) e `created_at`. Esse par de
@@ -113,7 +114,7 @@ nos dois serviços, e `spring-security-test` só no Accounts.
 | Método e caminho | Sucesso | Erros (`code`) |
 |---|---|---|
 | `POST /accounts` (header `Idempotency-Key`: UUID; corpo `{fullName, cpf, birthDate}`) | `201 Created`, `Location: /accounts/{accountId}`, corpo `{accountId, status, cpf (mascarado), canMoveMoney, openedAt}` | `400 IDEMPOTENCY_KEY_MISSING`, `400 IDEMPOTENCY_KEY_INVALID` (não é UUID), `400 VALIDATION_ERROR` (lista os campos), `422 ACCOUNT_INVALID_CPF`, `422 ACCOUNT_HOLDER_UNDERAGE`, `422 IDENTITY_EMAIL_MISSING`, `409 ACCOUNT_ALREADY_OPEN`, `409 ACCOUNT_CPF_ALREADY_REGISTERED`, `409 ACCOUNT_IDENTITY_ALREADY_LINKED`, `422 IDEMPOTENCY_KEY_REUSED`, `409 IDEMPOTENCY_REQUEST_IN_PROGRESS`, `401 AUTHENTICATION_REQUIRED`, `503 SERVICE_UNAVAILABLE` |
-| `GET /accounts/{accountId}` | `200`, corpo `{accountId, status, cpf (mascarado), canMoveMoney, openedAt, activatedAt}` | `404 ACCOUNT_NOT_FOUND` (também para conta de outro `sub`), `401 AUTHENTICATION_REQUIRED`, `503 SERVICE_UNAVAILABLE` |
+| `GET /accounts/{accountId}` | `200`, corpo `{accountId, status, cpf (mascarado), canMoveMoney, openedAt, activatedAt}` | `400 VALIDATION_ERROR` (`accountId` que não é UUID), `404 ACCOUNT_NOT_FOUND` (também para conta de outro `sub`), `401 AUTHENTICATION_REQUIRED`, `503 SERVICE_UNAVAILABLE` |
 
 - Os erros saem em `ProblemDetail` (`spring.mvc.problemdetails.enabled=true` e um `@RestControllerAdvice` que estende
   `ResponseEntityExceptionHandler`), com a propriedade `code`. O `401` também sai em `ProblemDetail`, por meio de um
@@ -151,7 +152,8 @@ nos dois serviços, e `spring-security-test` só no Accounts.
 ### D4. Idempotência da abertura
 
 Tabela `idempotency_records`: PK (`owner_subject`, `idempotency_key`), `request_hash` (SHA-256 do corpo canônico, com o
-CPF normalizado), `response_status`, `response_body` (JSONB, só com o CPF mascarado) e `created_at`.
+CPF normalizado; se o corpo não é parseável ou o CPF não normaliza, o hash é do corpo bruto, para que a repetição do
+mesmo corpo inválido dê o mesmo `400`), `response_status`, `response_body` (JSONB, só com o CPF mascarado) e `created_at`.
 
 Fluxo do `AccountOpeningService`:
 1. Se já existe registro para (`sub`, chave): se o hash é igual, devolve a resposta gravada; se é diferente, devolve
@@ -269,7 +271,8 @@ Tabela `processed_events` (`event_id` PK, `processed_at`) em cada serviço. Numa
 
 `ledger_accounts`: `id` (UUID v7, gerado na aplicação), `account_id` (UUID, **UNIQUE**), `currency` (CHAR(3), `BRL`) e
 `created_at`. Não há coluna de saldo (Artigo III). As tabelas `ledger_entries` e `holds` nascem nas changes 002 e 004.
-O `id` de `outbox_events` do Ledger também é UUID v7.
+O `id` de `outbox_events` do Ledger também é UUID v7. Os dois vêm do gerador `UuidV7` do Ledger (D2), porque o insert
+de `ledger_accounts` é nativo (`ON CONFLICT`) e não passa pelo gerador do Hibernate.
 
 O Ledger não expõe API de negócio nesta change e **não é resource server**. Ele não tem Spring Security, e o único
 HTTP que serve é o Actuator, na porta de management (D12). Quando a change 002 criar a primeira API do Ledger, ela
@@ -397,7 +400,8 @@ e os testes de contrato protegem a compatibilidade. A decisão de criar uma bibl
   Não há cancelamento automático, e as contas continuam PENDENTE. Outras métricas de pendência (total e idade da mais
   antiga) só entram quando algum requisito pedir.
 - Health checks do Actuator com os grupos `liveness` (só `livenessState`) e `readiness` (`readinessState` e `db`).
-  Não há health indicator de Kafka: o Spring Boot 4.1 não traz um, e a abertura de conta é AP em relação ao canal de
+  Não há health indicator de Kafka: o Spring Boot 4.1 não traz um (conferido nos JARs `spring-boot-actuator-autoconfigure`,
+  `spring-boot-health` e `spring-boot-kafka` 4.1.1, sem nenhuma classe de health ligada ao Kafka), e a abertura de conta é AP em relação ao canal de
   eventos (spec de contas, "Decisões de consistência"). Uma dependência que a consistência declarada tolera fora do ar
   não entra na readiness, senão o Kafka parado tiraria o serviço do balanceamento e recusaria pedidos que deveriam ser
   aceitos. A indisponibilidade do Kafka aparece no gauge `outbox.pending`, que cresce enquanto os eventos não saem.
@@ -415,7 +419,9 @@ e os testes de contrato protegem a compatibilidade. A decisão de criar uma bibl
   - `accounts-db` e `ledger-db` (PostgreSQL 17, portas 5433 e 5434);
   - `kafka` (imagem `apache/kafka`, KRaft, um nó);
   - `keycloak` (porta 8080), acrescentado na tarefa do realm (2.4);
-  - `accounts` (8081) e `ledger` (8082), com as portas de management (9081 e 9082) só na rede interna.
+  - `accounts` (8081) e `ledger` (8082), com as portas de management (9081 e 9082) só na rede interna. A imagem de
+    cada um vem de um `Dockerfile` multi-stage em `services/<nome>/` (contexto de build na raiz, por causa do POM
+    agregador); o healthcheck usa `/actuator/health/readiness` na porta de management.
 - Versões de imagem fixadas.
 - Os segredos vêm de `.env`, que fica fora do Git. Um `.env.example` vai versionado.
 - Os tópicos são criados pelas aplicações com beans `NewTopic` (3 partições).

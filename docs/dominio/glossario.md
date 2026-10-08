@@ -130,6 +130,16 @@ Valores da propriedade `code` do `ProblemDetail` (constituição, Artigo XI).
 | Conta contábil criada | `LedgerAccountCreated` |
 | Lançamento registrado | `LedgerEntryPosted` |
 
+### Envelope de eventos
+
+| Português (docs) | Inglês (código) |
+|---|---|
+| Identificador único do evento | `eventId` |
+| Tipo do evento | `eventType` |
+| Momento da ocorrência | `occurredAt` |
+| Identificador do agregado | `aggregateId` |
+| Versão do schema | `schemaVersion` |
+
 ## Siglas mantidas no original
 
 Pix, CPF, SPI, DICT, MED e LGPD não são traduzidas. No código seguem o padrão de nomes do Java (`PixKey`, `Cpf`).

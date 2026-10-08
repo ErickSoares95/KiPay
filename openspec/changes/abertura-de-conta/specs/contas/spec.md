@@ -62,7 +62,7 @@ verificada pelo formato e pelos dígitos verificadores. A situação do CPF na R
 ### Requirement: Dados cadastrais obrigatórios
 O sistema SHALL exigir nome completo, CPF e data de nascimento em todo pedido de abertura, e SHALL recusar o pedido em
 que falte algum deles ou em que algum tenha formato inválido, indicando cada campo com problema. Nenhum outro dado
-pessoal MUST ser pedido no cadastro.
+pessoal MUST ser pedido no cadastro. O nome completo MUST ser guardado como informado, sem os espaços nas pontas.
 
 #### Scenario: Nome completo ausente ou em branco
 - **WHEN** o pedido de abertura não traz o nome completo, ou o traz só com espaços
@@ -165,6 +165,11 @@ de conta aberta. Reusar a chave com conteúdo diferente MUST ser recusado.
   reenviado com a mesma chave e o mesmo conteúdo
 - **THEN** o sistema devolve a mesma recusa, com o mesmo código de erro
 
+#### Scenario: Repetição de um pedido recusado por dados inválidos
+- **WHEN** um pedido recusado como dados inválidos é reenviado com a mesma chave e o mesmo conteúdo
+- **THEN** o sistema devolve a mesma recusa de dados inválidos, e corrigir o pedido exige uma nova chave de
+  idempotência
+
 #### Scenario: Repetição de recusa depois de a condição mudar
 - **WHEN** um pedido recusado por titular menor de idade é reenviado com a mesma chave e o mesmo conteúdo depois de o
   titular completar 18 anos
@@ -264,6 +269,10 @@ contas nesta capacidade.
 #### Scenario: Consulta de conta inexistente
 - **WHEN** uma pessoa autenticada consulta um identificador de conta que não existe
 - **THEN** o sistema responde que a conta não foi encontrada, com o código de erro de conta não encontrada
+
+#### Scenario: Consulta com identificador de conta inválido
+- **WHEN** uma pessoa autenticada consulta uma conta com um identificador que não tem o formato de identificador de conta
+- **THEN** o sistema recusa o pedido como dados inválidos, indicando o campo do identificador
 
 #### Scenario: Consulta sem autenticação
 - **WHEN** um pedido de consulta chega sem credencial ou com credencial inválida ou expirada

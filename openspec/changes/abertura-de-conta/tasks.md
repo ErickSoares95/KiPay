@@ -59,8 +59,24 @@
   que `/actuator/prometheus` responde na porta de management, expõe `http_server_requests` e não responde na porta da
   aplicação. Outro teste confirma que uma linha de log capturada (`OutputCaptureExtension`) é JSON e contém `traceId`.
 - [ ] 2.3 Criar `infra/docker-compose.yml` (sem Keycloak), com `accounts-db`, `ledger-db`, `kafka`, `accounts` e
-  `ledger`, e o `.env.example` (D13). Verificação: `docker compose config` é válido, `docker compose up` deixa os
-  serviços healthy, e as portas de management não são publicadas no host.
+  `ledger`, e o `.env.example` (D13). Criar um Dockerfile multi-stage por serviço (build com Maven e Temurin 25, a
+  partir da raiz do monorepo por causa do POM agregador, e runtime com JRE 25), que o Compose usa para gerar as imagens
+  de `accounts` e `ledger` (D13). Nos dois serviços, configurar também (D12):
+  - o grupo `readiness` com `readinessState` e `db`, e o grupo `liveness` com só `livenessState`;
+  - `management.tracing.sampling.probability=1.0` no `application.yml`.
+
+  O healthcheck de `accounts` e `ledger` no Compose usa `/actuator/health/readiness` na porta de management.
+
+  Ajustes de código que a 2.1 deixou para trás, na mesma tarefa:
+  - tirar o `assertThat(flyway.info()).isNotNull()`, que nunca falha;
+  - remover o `spring.flyway.locations` redundante;
+  - corrigir o `@DisplayName` do teste de health, que hoje cita o Kafka.
+
+  Verificação: `docker compose config` é válido, `docker compose up` deixa os serviços healthy, e as portas de
+  management não são publicadas no host. Em cada serviço, testes confirmam que:
+  - o `/actuator/health/readiness` responde `UP` com o banco no ar, e o Kafka não faz parte do grupo `readiness`;
+  - o grupo `liveness` contém só `livenessState`;
+  - o valor efetivo de `management.tracing.sampling.probability` no contexto é `1.0`.
 - [ ] 2.4 Acrescentar o Keycloak ao Compose e criar o realm `kipay` (D9): clients `kipay-cli` e `accounts`, mapper de
   `email`, e-mail **não** obrigatório no perfil, usuários `ana`, `bruno` e `sem-email`. Em seguida:
   - exportar com `kc.sh export --realm kipay --users realm_file`, com o servidor parado ou num container separado;
@@ -74,9 +90,6 @@
   - o token de `ana` obtido com `kipay-cli` traz os claims `email` e `aud` contendo `accounts`;
   - o token de `sem-email` é emitido sem `invalid_grant` e não traz `email`.
 - [ ] 2.5 Criar `.github/workflows/ci.yml` (D13). Verificação: o workflow roda verde no GitHub depois do push.
-- [ ] 2.6 Fixar `management.tracing.sampling.probability=1.0` no `application.yml` dos dois serviços (D12).
-  Verificação: em cada serviço, um teste confirma que o valor efetivo de `management.tracing.sampling.probability` no
-  contexto é `1.0`.
 
 ## 3. Segurança do Accounts (contas: "Abertura de conta por pessoa física autenticada"; Artigo IX)
 
@@ -107,7 +120,8 @@
   identidade e CPF" e a parte idempotente de "Ativação após a confirmação do livro-razão". Verificação:
   - testes unitários de `canMoveMoney` (PENDING, ACTIVE e CLOSED, cenários do requisito "Conta não ativa não movimenta
     dinheiro") e de `activate` repetido;
-  - um teste confirma que os ids gerados são UUID versão 7;
+  - um teste confirma que os ids gerados pelo `UuidV7` (D2), no `@IdGeneratorType` das entidades e no uso direto, são
+    UUID versão 7;
   - testes de repositório com Testcontainers confirmam as três constraints, inclusive que uma segunda conta é aceita
     quando a primeira está `CLOSED`.
 - [ ] 4.3 Implementar o `AccountHolderPolicy` (idade mínima de 18 anos com `Clock` e fuso `America/Sao_Paulo`) e as
@@ -116,13 +130,16 @@
   - testes unitários com `Clock` fixo para a véspera do 18º aniversário (recusada), o dia do aniversário (aceito) e
     data futura (recusada);
   - para quem nasceu em 29 de fevereiro, num ano de 18º aniversário não bissexto: 28/02 recusado e 01/03 aceito;
-  - testes do validador para cada campo ausente ou inválido e para vários campos com problema ao mesmo tempo.
+  - testes do validador para cada campo ausente ou inválido e para vários campos com problema ao mesmo tempo;
+  - um teste confirma que o nome completo é guardado sem os espaços nas pontas.
 
 ## 5. Abertura, idempotência e Outbox no Accounts (contas)
 
 - [ ] 5.1 Implementar `OutboxEvent`, `OutboxWriter` (propagation `MANDATORY`) e a migration de `outbox_events` com
   `traceparent` (D6). Requisito: "Evento de conta aberta". Verificação: um teste de integração confirma que o
-  `OutboxWriter` fora de uma transação falha, e que um rollback da transação do agregado não deixa linha no Outbox.
+  `OutboxWriter` fora de uma transação falha, que um rollback da transação do agregado não deixa linha no Outbox, e que o
+  id de `outbox_events` é UUID versão 7 (`UuidV7`, D2). O schema `events/AccountOpened.v1.json` passa a existir em
+  `src/main/resources` (D5), e o payload gravado o respeita.
 - [ ] 5.2 Implementar o `OutboxRelay` (`FOR UPDATE SKIP LOCKED`, envio com `CompletableFuture`, `published_at`, gauge
   `outbox.pending`) e o `NewTopic` de `accounts.account-opened`, e ligar `spring.kafka.template.observation-enabled`
   (D5, D6, D12). Requisitos: "Evento de conta aberta", cenário "Conta criada gera evento", e "Visibilidade de eventos
@@ -141,8 +158,9 @@
   autenticada" e "Idempotência da abertura". Verificação: um teste confirma que o `/v3/api-docs` responde `200` sem
   token, com um documento OpenAPI válido, no Boot 4.1 com o Jackson 3. Testes de integração (MockMvc com `jwt()` e
   Testcontainers) para:
-  - abertura aceita (`201`, `Location`, status `PENDING` e e-mail do claim gravado), com o `AccountOpened` gravado
-    levando no `traceparent` o `traceId` da requisição;
+  - abertura aceita (`201`, `Location`, corpo com `accountId`, `status` `PENDING`, `cpf` mascarado, `canMoveMoney`
+    `false` e `openedAt`, e e-mail do claim gravado), com o `AccountOpened` gravado levando no `traceparent` o
+    `traceId` da requisição;
   - pedido sem token (`401 AUTHENTICATION_REQUIRED`, nenhuma conta criada);
   - token sem `email` (`422 IDENTITY_EMAIL_MISSING`);
   - repetição com a mesma chave;
@@ -186,7 +204,7 @@
   CPF mascarado (D3, D9). Requisitos: "Consulta da própria conta" e "Conta não ativa não movimenta dinheiro"
   (`canMoveMoney` na resposta). Verificação:
   - testes de integração para a própria conta (com `openedAt` e `activatedAt`), conta de outro `sub`
-    (`404 ACCOUNT_NOT_FOUND`), conta inexistente, pedido sem token (`401 AUTHENTICATION_REQUIRED`, idêntico para um id
+    (`404 ACCOUNT_NOT_FOUND`), conta inexistente, `accountId` que não é UUID (`400 VALIDATION_ERROR`), pedido sem token (`401 AUTHENTICATION_REQUIRED`, idêntico para um id
     existente e para um inexistente, para não revelar se a conta existe) e banco do Accounts indisponível
     (`503 SERVICE_UNAVAILABLE`);
   - um teste confirma o endpoint e as respostas `401`, `404` e `503` no `/v3/api-docs`.
@@ -199,12 +217,16 @@
 
 - [ ] 6.1 Implementar `LedgerAccount` (id UUID v7) e a migration de `ledger_accounts`, com `account_id` UNIQUE e sem
   coluna de saldo (D8). Requisito: "Criação da conta contábil a partir da conta aberta". Verificação: um teste de
-  repositório com Testcontainers confirma a unicidade, e um teste de schema confirma que não há coluna de saldo.
+  repositório com Testcontainers confirma a unicidade, um teste de schema confirma que não há coluna de saldo, e um
+  teste confirma que o id de `ledger_accounts`, gravado por insert nativo, é UUID versão 7, gerado pelo `UuidV7` do
+  Ledger (D2, D8).
 - [ ] 6.2 Implementar no Ledger o `OutboxWriter`, o `OutboxRelay` e o `NewTopic` de `ledger.ledger-account-created`,
   e ligar `spring.kafka.template.observation-enabled` (D5, D6, D12). Requisitos: "Confirmação da criação da conta
   contábil" e "Visibilidade de confirmações não publicadas". Verificação:
   - um teste de integração confirma que o `OutboxWriter` fora de uma transação falha, e que um rollback da transação
     do agregado não deixa linha no Outbox;
+  - um teste confirma que o id de `outbox_events` do Ledger é UUID versão 7, gerado pelo `UuidV7` do Ledger;
+  - o schema `events/LedgerAccountCreated.v1.json` existe em `src/main/resources` (D5) e o payload gravado o respeita;
   - um teste com Testcontainers Kafka confirma que o `LedgerAccountCreated` chega ao tópico com a chave `accountId`, o
     envelope completo e, no header `traceparent`, o `traceId` da observação aberta pelo teste ao gravar o evento no
     Outbox (o listener que dá origem ao trace real só nasce na 6.3);
