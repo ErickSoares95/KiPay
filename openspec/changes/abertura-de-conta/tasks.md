@@ -25,7 +25,7 @@
 
   Verificação: todas as seções do template estão preenchidas, o roadmap e a proposta dizem o mesmo que a ADR, e a ADR
   fica com o status "Aceita" depois da revisão no chat.
-- [ ] 1.4 Verificar a compatibilidade do release train do Spring Cloud com o Boot 4.1 como um todo, e escrever a
+- [x] 1.4 Verificar a compatibilidade do release train do Spring Cloud com o Boot 4.1 como um todo, e escrever a
   ADR-0006, "Spring Cloud com Boot 4.1, testes de contrato de eventos e springdoc" (D10). A ADR traz a escolha da
   ferramenta de contrato (Pact, D10), com a comparação das alternativas e o motivo da saída do Spring Cloud Contract,
   e as versões fixadas fora dos BOMs, do Pact e do springdoc (Artigo XII).
