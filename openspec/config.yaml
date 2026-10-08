@@ -64,8 +64,9 @@ operations:
   apply:
     guidance:
       - Implementar apenas a próxima tarefa pendente do tasks.md e parar ao final dela
-      - A conversa principal só orquestra. A implementação fica com o subagente executor (change, número da tarefa e
-        decisões ou plano aprovado), sem a conversa principal ler o código da tarefa
+      - A conversa principal só orquestra. A implementação fica com o subagente executor, ou com o infra nas tarefas
+        de infraestrutura (change, número da tarefa e decisões ou plano aprovado), sem a conversa principal ler o
+        código da tarefa
       - Antes do commit, rodar o subagente revisor com a seção "Tarefa" de docs/processo/checklist-revisao.md,
         passando os arquivos que o executor listou; uma falha volta ao mesmo executor via SendMessage, e só então o
         revisor roda de novo

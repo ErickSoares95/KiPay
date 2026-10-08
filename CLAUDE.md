@@ -18,7 +18,8 @@ A constituição é carregada abaixo e deve ser seguida antes de qualquer tarefa
 - Implemente **uma tarefa por vez**, cada uma numa **sessão nova**. O estado fica no repositório (tasks.md, ADRs,
   lições e git). Só considere a tarefa concluída com os testes passando.
 - A conversa principal só orquestra. Ela não implementa nem lê o código da tarefa:
-  1. chama o subagente `executor` com a change, o número da tarefa e as decisões já tomadas (ou o plano aprovado);
+  1. chama o subagente `executor` (ou o `infra`, nas tarefas de infraestrutura: Compose, Dockerfile, Keycloak e CI)
+     com a change, o número da tarefa e as decisões já tomadas (ou o plano aprovado);
   2. chama o subagente `revisor` com a seção "Tarefa" de `docs/processo/checklist-revisao.md`, passando os arquivos
      que o executor listou e o resultado da "Verificação";
   3. se o revisor apontar falha, devolve a falha ao **mesmo** executor com `SendMessage` e roda o revisor de novo.
