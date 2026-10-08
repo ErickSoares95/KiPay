@@ -87,6 +87,11 @@ estável.
 - **WHEN** o pedido é feito na véspera do dia em que o titular completa 18 anos
 - **THEN** o sistema recusa o pedido com o código de erro de titular menor de idade
 
+#### Scenario: Nascido em 29 de fevereiro
+- **WHEN** o titular nasceu em 29 de fevereiro e o ano em que completa 18 anos não é bissexto
+- **THEN** o sistema considera que ele completa 18 anos em 1º de março: recusa o pedido feito em 28 de fevereiro e
+  aceita o pedido feito em 1º de março
+
 ### Requirement: CPF único
 O sistema SHALL permitir no máximo uma conta não encerrada por CPF. Uma nova abertura para um CPF que já tem conta não
 encerrada MUST ser recusada com um código de erro de negócio estável, mesmo quando os pedidos chegam ao mesmo tempo.
@@ -102,10 +107,14 @@ Depois do encerramento, o CPF pode abrir uma nova conta, e a conta encerrada e o
 - **THEN** o sistema cria uma nova conta PENDENTE, e a conta encerrada continua existindo com os dados e o status
   inalterados
 
-#### Scenario: Pedidos simultâneos com o mesmo CPF
-- **WHEN** dois pedidos de abertura para o mesmo CPF, com chaves de idempotência diferentes, chegam ao mesmo tempo
-- **THEN** exatamente um deles cria a conta e o outro é recusado com um código de erro de CPF já cadastrado ou de conta
-  já aberta
+#### Scenario: Pedidos simultâneos da mesma identidade com o mesmo CPF
+- **WHEN** a mesma identidade envia, ao mesmo tempo, dois pedidos de abertura para o mesmo CPF com chaves de
+  idempotência diferentes
+- **THEN** exatamente um deles cria a conta e o outro é recusado com o código de erro de conta já aberta
+
+#### Scenario: Pedidos simultâneos de identidades diferentes com o mesmo CPF
+- **WHEN** duas identidades diferentes, ambas sem conta, enviam ao mesmo tempo pedidos de abertura para o mesmo CPF
+- **THEN** exatamente um deles cria a conta e o outro é recusado com o código de erro de CPF já cadastrado
 
 #### Scenario: Mesmo CPF com e sem pontuação
 - **WHEN** já existe uma conta não encerrada para um CPF e a mesma identidade envia um pedido com o mesmo CPF escrito
@@ -156,8 +165,12 @@ de conta aberta. Reusar a chave com conteúdo diferente MUST ser recusado.
   ou alterada
 
 #### Scenario: Pedido sem chave de idempotência
-- **WHEN** um pedido de abertura chega sem chave de idempotência, ou com uma chave em formato inválido
-- **THEN** o sistema recusa o pedido com o código de erro de chave de idempotência ausente ou inválida
+- **WHEN** um pedido de abertura chega sem chave de idempotência
+- **THEN** o sistema recusa o pedido com o código de erro de chave de idempotência ausente e não cria conta
+
+#### Scenario: Chave de idempotência em formato inválido
+- **WHEN** um pedido de abertura chega com uma chave de idempotência em formato inválido
+- **THEN** o sistema recusa o pedido com o código de erro de chave de idempotência inválida e não cria conta
 
 #### Scenario: Repetições simultâneas com a mesma chave
 - **WHEN** dois pedidos idênticos com a mesma chave de idempotência chegam ao mesmo tempo
@@ -219,13 +232,14 @@ de movimentação criadas em changes futuras MUST consultar essa regra e recusar
 - **THEN** a resposta é positiva
 
 ### Requirement: Consulta da própria conta
-O sistema SHALL permitir que uma pessoa autenticada consulte as próprias contas, com o identificador, o status e o
-momento da abertura e da ativação. O CPF MUST aparecer mascarado na resposta. Uma conta de outra identidade MUST ser
-tratada como inexistente.
+O sistema SHALL permitir que uma pessoa autenticada consulte uma conta aberta por ela, informando o identificador da
+conta, e receba o status, se a conta pode movimentar dinheiro e o momento da abertura e da ativação. O CPF MUST
+aparecer mascarado na resposta. Uma conta de outra identidade MUST ser tratada como inexistente. Não há listagem de
+contas nesta capacidade.
 
 #### Scenario: Consulta da própria conta
-- **WHEN** o titular autenticado consulta uma conta aberta por ele
-- **THEN** o sistema devolve o identificador, o status atual e o CPF mascarado
+- **WHEN** o titular autenticado consulta, pelo identificador, uma conta aberta por ele
+- **THEN** o sistema devolve o identificador, o status atual, se a conta pode movimentar dinheiro e o CPF mascarado
 
 #### Scenario: Consulta de conta de outro titular
 - **WHEN** uma pessoa autenticada consulta o identificador de uma conta aberta por outra identidade

@@ -25,12 +25,15 @@ Outbox, consumidor idempotente e unicidade de CPF (`docs/arquitetura/visao-geral
   ficam visíveis numa métrica.
 - A requisição de abertura exige chave de idempotência (`Idempotency-Key`). A mesma chave devolve o mesmo resultado,
   sem criar uma segunda conta.
-- O titular consulta a própria conta, incluindo o status, e não enxerga contas de outros titulares.
+- O titular consulta a própria conta pelo identificador, incluindo o status, e não enxerga contas de outros titulares.
+  Não há listagem de contas nesta change.
 - Os serviços Accounts e Ledger nascem com banco PostgreSQL próprio, Kafka, Docker Compose, CI e observabilidade de base
   (logs JSON mascarados, `traceId` propagado também pelos eventos, métricas RED e health checks).
-- **Antecipação em relação ao roadmap**: o Keycloak entra já nesta change. Accounts e Ledger validam o token JWT, e a
-  conta fica vinculada à identidade de quem a abriu (Artigo IX). O API Gateway continua na feature 3 (borda e
-  identidade). A escolha do Keycloak e a antecipação ficam registradas na ADR-0005, e a seção 6 de
+- **Antecipação em relação ao roadmap**: o Keycloak entra já nesta change. O Accounts, único serviço com API nesta
+  change, valida o token JWT, e a conta fica vinculada à identidade de quem a abriu (Artigo IX). O Ledger não recebe
+  requisições com token nesta change: só consome eventos. Ele passa a validar o token quando expuser API (change 002).
+  O API Gateway continua na feature 3 (borda e identidade). A escolha do Keycloak, a antecipação, o escopo da validação
+  por serviço e o adiamento da validação no Gateway ficam registrados na ADR-0005. A seção 6 de
   `docs/arquitetura/visao-geral.md` será atualizada para refletir isso.
 
 ## Capabilities
