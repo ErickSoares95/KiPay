@@ -85,6 +85,8 @@
     `ProblemDetail`;
   - o health e o Prometheus da porta de management continuam respondendo sem token.
 
+  > **Plan mode recomendado** — foco: issuer, audiência e `401` em `ProblemDetail` sem bloquear a porta de management. Prompt sugerido: CLAUDE.md, seção "Modo plan".
+
 ## 4. Domínio do Accounts (contas)
 
 - [ ] 4.1 Implementar o value object `Cpf`: normalização, formato, dígitos verificadores, dígitos repetidos e
@@ -118,6 +120,9 @@
   cenário "Conta criada gera evento". Verificação: um teste com Testcontainers Kafka confirma que o evento chega ao
   tópico com a chave `accountId`, o envelope completo e o mesmo `traceId` da requisição. Outro teste confirma que, com o
   Kafka parado, o evento continua pendente e é publicado quando o Kafka volta.
+
+  > **Plan mode recomendado** — foco: lock `FOR UPDATE SKIP LOCKED`, timeout do envio e propagação do `traceparent`. Prompt sugerido: CLAUDE.md, seção "Modo plan".
+
 - [ ] 5.3 Implementar e documentar no OpenAPI o `POST /accounts` (`{fullName, cpf, birthDate}`, com `email` do claim).
   O `AccountOpeningService` e a migration de `idempotency_records` seguem D3 e D4, com o `INSERT` da chave como
   primeiro comando da transação. Requisitos: "Abertura de conta por pessoa física autenticada" e "Idempotência da
@@ -135,6 +140,9 @@
     `201`, `400`, `401`, `409`, `422`.
 
   Cada teste de abertura confirma também a quantidade de contas e de linhas no Outbox.
+
+  > **Plan mode recomendado** — foco: ordem dos comandos na transação e reserva da chave de idempotência. Prompt sugerido: CLAUDE.md, seção "Modo plan".
+
 - [ ] 5.4 Tratar a unicidade e o vínculo identidade ↔ CPF, inclusive em concorrência: as constraints garantem a
   invariante, e as verificações 4 e 5 de D3, refeitas numa nova transação, decidem o código (D3, e D4 passos 3 e 4).
   Requisitos: "CPF único", "Vínculo entre identidade e CPF" e "Idempotência da abertura", cenário de repetições
@@ -153,6 +161,9 @@
     `IDEMPOTENCY_REQUEST_IN_PROGRESS`, nunca um `409` de CPF.
 
   Cada teste confirma a quantidade final de titulares, contas e linhas no Outbox.
+
+  > **Plan mode recomendado** — foco: nova transação para decidir o código após violação de constraint, com testes concorrentes. Prompt sugerido: CLAUDE.md, seção "Modo plan".
+
 - [ ] 5.5 Implementar e documentar no OpenAPI o `GET /accounts/{accountId}`, com autorização por `owner_subject` e
   CPF mascarado (D3, D9). Requisitos: "Consulta da própria conta" e "Conta não ativa não movimenta dinheiro"
   (`canMoveMoney` na resposta). Verificação:
@@ -170,6 +181,9 @@
   repositório com Testcontainers confirma a unicidade, e um teste de schema confirma que não há coluna de saldo.
 - [ ] 6.2 Implementar no Ledger o `OutboxWriter`, o `OutboxRelay` e o `NewTopic` de `ledger.ledger-account-created`
   (D5, D6). Requisito: "Confirmação da criação da conta contábil". Verificação: testes equivalentes aos de 5.1 e 5.2.
+
+  > **Plan mode recomendado** — foco: reaproveitar o desenho de 5.1 e 5.2 no Ledger, sem biblioteca compartilhada. Prompt sugerido: CLAUDE.md, seção "Modo plan".
+
 - [ ] 6.3 Implementar o `AccountOpenedListener` com `processed_events`, `INSERT ... ON CONFLICT (account_id) DO NOTHING`
   em `ledger_accounts`, o `DefaultErrorHandler` e a DLT `accounts.account-opened.dlt` (D7). Requisitos: "Criação da
   conta contábil a partir da conta aberta", "Uma única conta contábil por conta", "Confirmação da criação da conta
@@ -184,6 +198,8 @@
   - `schemaVersion` desconhecida e payload inválido (vão para a DLT e o evento seguinte é processado);
   - falha temporária do banco (nova tentativa).
 
+  > **Plan mode recomendado** — foco: `ON CONFLICT`, `processed_events`, DLT e os sete cenários de teste. Prompt sugerido: CLAUDE.md, seção "Modo plan".
+
 ## 7. Ativação no Accounts (contas)
 
 - [ ] 7.1 Implementar o `LedgerAccountCreatedListener` com `processed_events` e a DLT
@@ -193,6 +209,9 @@
   - confirmação duplicada (`activated_at` inalterado);
   - conta desconhecida (DLT, sem bloquear a seguinte);
   - conta sem confirmação (continua `PENDING`, sem nenhuma alteração automática).
+
+  > **Plan mode recomendado** — foco: ativação idempotente e conta desconhecida na DLT. Prompt sugerido: CLAUDE.md, seção "Modo plan".
+
 - [ ] 7.2 Expor o gauge `accounts.pending.stale` (limite `kipay.accounts.pending-stale-threshold`, padrão `10m`) e o
   contador `accounts.opening.requests` (D12). Requisito: "Visibilidade de contas pendentes". Verificação: um teste com
   `Clock` controlado confirma no `/actuator/prometheus` da porta de management:
@@ -215,6 +234,8 @@
   - `mvn -f services/accounts verify` e `mvn -f services/ledger verify` passam sozinhos;
   - alterar um campo do payload em qualquer produtor quebra o teste de produtor correspondente;
   - o CI falha quando um pact gerado difere do versionado.
+
+  > **Plan mode recomendado** — foco: pacts nos dois sentidos, injeção por construtor no teste de produtor e passo do CI. Prompt sugerido: CLAUDE.md, seção "Modo plan".
 
 ## 9. Verificação ponta a ponta
 

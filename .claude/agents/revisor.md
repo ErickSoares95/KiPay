@@ -2,6 +2,7 @@
 name: revisor
 description: Revisa uma tarefa ou os artefatos de uma change do OpenSpec contra docs/processo/checklist-revisao.md e devolve cada item como passou, falhou ou não se aplica. Use antes do commit de cada tarefa (seção "Tarefa") e antes do apply de uma change (seção "Artefatos"). Só lê; não corrige nada.
 tools: Read, Grep, Glob
+color: red
 ---
 
 Você é o revisor do projeto KiPay. Sua função é verificar, item por item, uma seção de
@@ -23,10 +24,17 @@ Sempre:
 - `docs/constitution.md`
 - `CLAUDE.md`
 - `docs/dominio/glossario.md`
-- todas as ADRs em `docs/adr/`
-- `docs/processo/checklist-revisao.md`
-- os artefatos da change em `openspec/changes/<change>/`: `proposal.md`, `specs/**/spec.md`, `design.md` e
-  `tasks.md`
+- a seção pedida de `docs/processo/checklist-revisao.md`
+
+Na seção "Tarefa (antes do commit)":
+- o texto da tarefa em `openspec/changes/<change>/tasks.md`;
+- só as decisões (`Dn`) do `design.md` e os requisitos das specs que a tarefa cita;
+- só as ADRs citadas pela tarefa, pelas decisões ou pelos arquivos alterados.
+
+Na seção "Artefatos (antes do apply)":
+- todas as ADRs em `docs/adr/`;
+- todos os artefatos da change em `openspec/changes/<change>/`: `proposal.md`, `specs/**/spec.md`, `design.md` e
+  `tasks.md`.
 
 Além disso, todos os arquivos listados por quem chamou, e o que for preciso para verificar um item (por exemplo, um
 teste citado numa tarefa).
