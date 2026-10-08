@@ -115,7 +115,7 @@
 - [x] 4.1 Implementar o value object `Cpf`: normalização, formato, dígitos verificadores, dígitos repetidos e
   `toString()` mascarado (D2). Requisito: "Validação do CPF". Verificação: testes unitários cobrem os quatro cenários
   do requisito e o mascaramento.
-- [ ] 4.2 Implementar as entidades `AccountHolder` (`cpf`, `ownerSubject`, `fullName`, `birthDate`, `email`) e
+- [x] 4.2 Implementar as entidades `AccountHolder` (`cpf`, `ownerSubject`, `fullName`, `birthDate`, `email`) e
   `Account` (`status` com `PENDING`, `ACTIVE` e `CLOSED`, `activate`, `canMoveMoney` e `version`), com ids UUID v7, e a
   migration `V1` com as constraints `uk_account_holders_cpf`, `uk_account_holders_owner_subject` e o índice parcial
   `uk_accounts_open_per_holder` (D2). Requisitos: "Conta não ativa não movimenta dinheiro", "CPF único", "Vínculo entre
@@ -308,7 +308,12 @@
 
   Verificação: com o `docker compose up`, o script termina com código 0, e o `traceId` da abertura aparece nos logs do
   Accounts e do Ledger. O token real do Keycloak aceito pelo Accounts cobre a busca de chaves pelo `issuer-uri`, que os
-  testes de `401` (tokens assinados no teste) não exercitam (D9).
+  testes de `401` (tokens assinados no teste) não exercitam (D9). A 3.1 deixou o `issuer-uri` configurável por
+  `KIPAY_ISSUER_URI`; esta tarefa resolve o descompasso entre o `iss` do token obtido no host (`localhost:8080`) e o
+  acesso ao Keycloak dentro do Compose (`keycloak:8080`), fixando `KC_HOSTNAME` ou separando o `jwk-set-uri` do
+  `issuer`, e registra a escolha em ADR se ela mudar uma decisão já aceita.
+
+  > **Plan mode recomendado** — foco: issuer do token versus rede do Compose (`KC_HOSTNAME` ou `jwk-set-uri` separado). Prompt sugerido: CLAUDE.md, seção "Modo plan".
 - [ ] 9.2 Atualizar o `README.md` (status, como subir o ambiente, como rodar o smoke test) e montar a tabela de
   rastreabilidade cenário → teste nesta change. Verificação: todo cenário das duas specs tem pelo menos um teste
   listado, e `mvn verify` na raiz passa.
