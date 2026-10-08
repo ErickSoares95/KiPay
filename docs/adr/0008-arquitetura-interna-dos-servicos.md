@@ -25,6 +25,9 @@ domínio sem que alguém perceba. A regra precisa ser verificada por teste, e n�
     `org.springframework.transaction..`, para o `@Transactional`. Os serviços não usam `@Service`; são registrados
     como `@Bean` em `config/`.
   - `adapter`: entrada (Kafka) e saída (JPA/`JdbcClient`, Outbox, geração de UUID v7).
+- **Serviços futuros**: Arquitetura Hexagonal quando o serviço for domínio principal ou concentrar regras de negócio
+  críticas; pacotes por funcionalidade nos demais. A escolha é registrada no design da change que cria o serviço,
+  citando esta ADR.
 - Um teste **ArchUnit** no Ledger falha se `domain` depender de Spring ou JPA, e se `application` depender de algo fora
   da lista acima ou de `adapter`.
 - O **ArchUnit** (`archunit-junit5`, escopo de teste) fica fora dos BOMs do Spring Boot e do Spring Cloud. A exceção
