@@ -26,26 +26,27 @@
   Verificação: todas as seções do template estão preenchidas, o roadmap e a proposta dizem o mesmo que a ADR, e a ADR
   fica com o status "Aceita" depois da revisão no chat.
 - [ ] 1.4 Verificar a compatibilidade do release train do Spring Cloud com o Boot 4.1 como um todo, e escrever a
-  ADR-0006, "Spring Cloud com Boot 4.1, testes de contrato de eventos e springdoc" (D10). A ADR traz a comparação
-  entre Spring Cloud Contract e Pact pelos critérios de D10 e a versão fixada do springdoc fora do BOM (Artigo XII).
+  ADR-0006, "Spring Cloud com Boot 4.1, testes de contrato de eventos e springdoc" (D10). A ADR traz a escolha da
+  ferramenta de contrato (Pact, D10), com a comparação das alternativas e o motivo da saída do Spring Cloud Contract,
+  e as versões fixadas fora dos BOMs, do Pact e do springdoc (Artigo XII).
   Verificação:
   - a tabela de compatibilidade oficial é citada na ADR;
   - um POM de teste no scratchpad, fora do repositório, com `spring-boot-starter-parent` 4.1.x e o BOM do train
-    escolhido resolve (`mvn dependency:resolve`) estes módulos: Contract Verifier e Stub Runner,
-    `spring-cloud-starter-gateway-server-webmvc`, Config, Eureka server e client, LoadBalancer, CircuitBreaker com
-    Resilience4j e `springdoc-openapi-starter-webmvc-ui` 3.x;
-  - nesse POM, um contrato de mensagem de brinquedo (Kafka, payload JSON com Jackson 3) gera o teste de produtor pelo
-    plugin, e `mvn verify` passa;
-  - o POM de teste tem dois módulos com contratos nos dois sentidos. Cada consumidor gera os stubs a partir da pasta
-    de contratos do outro módulo, sem dependência Maven entre os módulos (D10). O `mvn verify` passa com um
-    repositório local vazio (`-Dmaven.repo.local=<pasta nova>`), e cada módulo também builda sozinho com
-    `mvn -f <módulo>`. A ADR registra a configuração do Stub Runner usada;
+    escolhido resolve (`mvn dependency:resolve`) estes módulos: `spring-cloud-starter-gateway-server-webmvc`, Config,
+    Eureka server e client, LoadBalancer, CircuitBreaker com Resilience4j, `springdoc-openapi-starter-webmvc-ui` 3.x
+    e os módulos `consumer:junit5` e `provider:junit5` do Pact;
+  - nesse POM, um contrato de mensagem de brinquedo (Kafka, payload JSON com Jackson 3) é gravado pelo consumidor e
+    verificado pelo produtor, que publica de fato no Kafka, e `mvn verify` passa. Alterar o payload do produtor quebra
+    a verificação;
+  - o POM de teste tem dois módulos com contratos nos dois sentidos. Os pacts ficam numa pasta compartilhada, sem
+    dependência Maven entre os módulos (D10). O `mvn verify` passa com um repositório local vazio
+    (`-Dmaven.repo.local=<pasta nova>`), e cada módulo também builda sozinho com `mvn -f <módulo>`. A ADR registra a
+    configuração usada (`@PactDirectory` e `@PactFolder`);
   - a ADR registra a decisão sobre o Service Registry (Eureka na feature 3, ou o adiamento se o Kubernetes o
     dispensar);
   - a ADR fica com o status "Aceita" depois da revisão.
 
-  Se não houver train compatível, eu paro e aviso (conflito com a constituição). Se só o Contract falhar, a tarefa 8.1
-  é ajustada com `/opsx:update`.
+  Se não houver train compatível, eu paro e aviso (conflito com a constituição).
 
 ## 2. Fundação dos serviços e da infraestrutura
 
@@ -203,14 +204,17 @@
 
 ## 8. Testes de contrato (Artigo VII; D10, conforme a ADR-0006)
 
-- [ ] 8.1 Criar os contratos de `AccountOpened` (produtor Accounts, consumidor Ledger) e de `LedgerAccountCreated`
-  (produtor Ledger, consumidor Accounts). Os testes de produtor são gerados nos dois serviços, e o Stub Runner dispara
-  o listener do consumidor a partir dos contratos do produtor no monorepo, sem dependência Maven entre os serviços
-  (D10). Requisitos: "Evento de conta aberta", "Criação da conta contábil a partir da conta aberta", "Confirmação da
-  criação da conta contábil" e "Ativação após a confirmação do livro-razão". Verificação:
+- [ ] 8.1 Criar os pacts de `AccountOpened` (consumidor Ledger, produtor Accounts) e de `LedgerAccountCreated`
+  (consumidor Accounts, produtor Ledger). Os testes de consumidor gravam os pacts em `contracts/pacts/`, versionado no
+  repositório. Os testes de produtor dos dois serviços verificam esses pacts publicando de fato no Kafka
+  (Testcontainers), sem dependência Maven entre os serviços (D10). O `ci.yml` ganha o passo
+  `git diff --exit-code contracts/pacts`. Requisitos: "Evento de conta aberta", "Criação da conta contábil a partir da
+  conta aberta", "Confirmação da criação da conta contábil" e "Ativação após a confirmação do livro-razão".
+  Verificação:
   - `mvn verify` na raiz passa com um repositório local vazio;
   - `mvn -f services/accounts verify` e `mvn -f services/ledger verify` passam sozinhos;
-  - alterar um campo do payload em qualquer produtor quebra o teste de produtor correspondente.
+  - alterar um campo do payload em qualquer produtor quebra o teste de produtor correspondente;
+  - o CI falha quando um pact gerado difere do versionado.
 
 ## 9. Verificação ponta a ponta
 

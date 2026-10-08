@@ -299,8 +299,7 @@ traz o `SecurityFilterChain` e a validação do token, como prevê a ADR-0005.
 ### D10. Spring Cloud e testes de contrato dos eventos (vira ADR-0006)
 
 **Pré-condição**: identificar o release train do Spring Cloud compatível com o Boot 4.1. A verificação vale para o
-train como um todo, não só para o Spring Cloud Contract. Os módulos previstos no roadmap devem ter versão compatível:
-- Contract (Verifier e Stub Runner);
+train como um todo. Os módulos previstos no roadmap devem ter versão compatível:
 - Gateway, na variante `spring-cloud-starter-gateway-server-webmvc`, coerente com o stack servlet e as virtual
   threads;
 - Config (server e client);
@@ -311,59 +310,45 @@ train como um todo, não só para o Spring Cloud Contract. Os módulos previstos
 - CircuitBreaker com Resilience4j.
 
 A verificação usa a tabela de compatibilidade oficial e um POM de teste que importa o BOM e resolve esses módulos. O
-risco real está no modo de mensageria do Contract com Kafka e Jackson 3. Por isso, um contrato de mensagem de
-brinquedo precisa gerar o teste de produtor pelo plugin e passar no `mvn verify` do POM de teste. Um `@SpringBootTest`
-que só sobe o contexto provaria pouco.
+risco real está nos testes de contrato de mensagem com Kafka e Jackson 3. Por isso, um contrato de mensagem de
+brinquedo precisa ser gravado pelo consumidor e verificado pelo produtor no `mvn verify` do POM de teste, com o
+produtor publicando de fato no Kafka. Um `@SpringBootTest` que só sobe o contexto provaria pouco.
 
 O mesmo POM resolve o springdoc 3.x com o Boot 4.1. O springdoc fica fora dos BOMs do Boot e do Spring Cloud, e o
-Artigo XII exige ADR para essa exceção, então a versão fixada é registrada na ADR-0006.
+Artigo XII exige ADR para essa exceção, então a versão fixada é registrada na ADR-0006. A versão do Pact também fica
+fora dos BOMs e é registrada na mesma ADR.
 
 Se não houver train compatível com o Boot 4.1, isso contradiz as restrições técnicas da constituição. Nesse caso, eu
 paro e aviso, em vez de escolher outra versão do Boot.
 
-Escolha proposta:
+**Mudança em 2026-10-08**: em 2026-07-06, o Spring Cloud Contract deixou de ser mantido pela equipe do Spring. Ele
+saiu de todos os release trains (não está no BOM 2025.1.3), e o repositório foi arquivado. A manutenção passou para o
+Stubborn.sh (`sh.stubborn`).
 
-**Spring Cloud Contract**, no modo de mensageria:
-- Os contratos de `AccountOpened` ficam no Accounts, que é o produtor, em
-  `services/accounts/src/test/resources/contracts`. O Accounts gera os testes de produtor a partir deles.
-- O Ledger usa o Stub Runner para disparar o evento no próprio listener.
-- O mesmo vale, no sentido inverso, para `LedgerAccountCreated`, com os contratos no Ledger.
+Escolha: **Pact JVM** (`au.com.dius.pact`, módulos `consumer:junit5` e `provider:junit5`, pacts V4 de mensagem
+assíncrona):
+- o **consumidor** define o que espera do evento num teste JUnit, e o Pact grava o arquivo de pact em
+  `contracts/pacts/`, na raiz do monorepo (`@PactDirectory`). O teste entrega a mensagem ao handler real do listener;
+- o **produtor** verifica os pacts dessa pasta (`@PactFolder`). O método `@PactVerifyProvider` chama o publisher real,
+  lê a mensagem publicada no Kafka (Testcontainers) e a devolve para comparação;
+- os arquivos de pact são **versionados** no repositório. Assim, cada serviço builda sozinho
+  (`mvn -f services/<nome>`), sem Pact Broker e sem dependência Maven entre os serviços;
+- o CI falha se um teste de consumidor gerar um pact diferente do versionado (`git diff --exit-code contracts/pacts`).
+  Isso impede que o produtor seja verificado contra um pact desatualizado.
 
 **Requisito: nenhum serviço depende de artefato Maven do outro.** Os contratos vão nos dois sentidos. Se cada serviço
-declarasse o jar de stubs do outro como dependência de teste, o reactor do Maven acusaria ciclo (accounts →
-ledger-stubs → ledger → accounts-stubs → accounts). Se os stubs viessem do `~/.m2` sem estar declarados, o primeiro
-`mvn verify` num CI limpo falharia, porque eles ainda não existiriam. Os dois caminhos também quebram a ADR-0002
-(cada serviço buildável sozinho com `mvn -f services/<nome>`).
+declarasse o artefato de teste do outro como dependência, o reactor do Maven acusaria ciclo (accounts → ledger-tests
+→ ledger → accounts-tests → accounts). Se o artefato viesse do `~/.m2` sem estar declarado, o primeiro `mvn verify`
+num CI limpo falharia, porque ele ainda não existiria. Os dois caminhos também quebram a ADR-0002 (cada serviço
+buildável sozinho com `mvn -f services/<nome>`). A pasta versionada de pacts atende ao requisito.
 
-Por isso, o consumidor gera os stubs na hora, a partir dos contratos do produtor que estão no monorepo. O candidato é o
-Stub Runner apontando para a pasta de contratos do produtor (protocolo `stubs://file://...`, com geração de stubs a
-partir dos contratos). A tarefa 1.4 confirma a configuração exata.
-
-- Alternativa descartada: **jar de stubs do produtor como dependência de teste do consumidor**. Cria ciclo no reactor
-  e impede buildar um serviço sozinho.
-
-A ferramenta faz parte do release train do Spring Cloud, cujas versões vêm do BOM (Artigo XII). Mesmo assim, é
-tecnologia nova no projeto, e por isso a escolha é registrada em uma ADR (ADR-0006) antes do uso.
-
-A ADR-0006 compara o Spring Cloud Contract com o Pact pelos critérios abaixo:
-- quem define o contrato (produtor ou consumidor);
-- suporte a mensagens no Kafka;
-- integração com o Maven e o Spring Boot 4.1;
-- necessidade de infraestrutura extra (Pact Broker, que é dispensável num monorepo);
-- como o contrato chega ao outro lado sem acoplar os builds dos serviços;
-- gestão de versão (BOM do Spring Cloud × versão fixada fora do BOM);
-- compatibilidade com o Jackson 3;
-- custo de manutenção para uma pessoa.
-
-- Alternativa considerada: **Pact (pact-jvm)**. É orientado ao consumidor, tem um ecossistema forte para HTTP e suporta
-  mensagens. Num monorepo, ele funciona com os arquivos de pact no sistema de arquivos, sem Pact Broker, então a
-  infraestrutura não é o argumento decisivo. O argumento mais forte a favor do Spring Cloud Contract é estar no BOM do
-  Spring Cloud, com versão gerida junto com o resto do stack (Artigo XII). O Pact exigiria mais uma exceção de versão
-  registrada em ADR.
+- Alternativa descartada: **Spring Cloud Contract**. Não é mais mantido pelo Spring e saiu dos release trains.
+- Alternativa descartada: **Stubborn Contract** (continuação do Spring Cloud Contract). Manteria o mesmo modelo, mas
+  está na versão 0.x e depende de um único mantenedor.
 - Alternativa descartada: **JSON Schema compartilhado, validado nos dois lados**. É leve, mas depende de uma
   biblioteca de validação fora dos BOMs e com suporte incerto ao Jackson 3.
-- **Risco**: a compatibilidade do Spring Cloud Contract com o Boot 4.1 precisa ser confirmada na tarefa da ADR. Se o
-  train existir mas o Contract falhar, a ADR registra o Pact ou a alternativa do JSON Schema.
+- Alternativa descartada: **jar de stubs ou de pacts do outro serviço como dependência de teste**. Cria ciclo no
+  reactor e impede buildar um serviço sozinho.
 
 ### D11. Código duplicado entre serviços
 
@@ -442,8 +427,8 @@ Antes do código, entram em `docs/dominio/glossario.md`:
   necessário para a unicidade e para KYC. Criptografia em repouso fica para a fase de plataforma.
 - **[Risco] O e-mail guardado diverge do e-mail atual no Keycloak, se o usuário trocá-lo.** → Aceito nesta change. A
   sincronização fica para quando as Notifications precisarem do e-mail.
-- **[Risco] O Spring Cloud Contract pode não estar pronto para o Boot 4.1.** → Mitigação: verificar na tarefa da
-  ADR-0006, com o Pact e o JSON Schema como alternativas já descritas.
+- **[Risco] O Pact fica fora dos BOMs**, e a versão é fixada e atualizada à mão. → Registrada na ADR-0006. O Pact
+  4.7.5 foi verificado com o Boot 4.1.1 e o Jackson 3 e não traz o Jackson 2.
 - **[Trade-off] O relay por polling adiciona latência (até o `fixedDelay`) e consultas periódicas.** Aceito em troca da
   simplicidade em relação ao CDC.
 - **[Trade-off] Duplicação do envelope e do Outbox nos dois serviços (D11).**
